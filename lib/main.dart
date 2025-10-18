@@ -31,8 +31,6 @@ class MyApp extends StatelessWidget {
           onSecondary: AppTheme.textPrimary,
           error: AppTheme.negative,
           onError: Colors.white,
-          background: AppTheme.primary,
-          onBackground: AppTheme.textPrimary,
           surface: AppTheme.surfaceLight,
           onSurface: AppTheme.textPrimary,
         ),

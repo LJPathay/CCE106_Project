@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../UI/theme.dart';
-import '../UI/input_field.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -15,8 +14,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
   bool _loading = false;
+  bool _obscurePassword = true;
 
   Future<void> _register() async {
     setState(() => _loading = true);
@@ -39,7 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Account created! Please log in.')),
       );
-      // Optionally navigate to login/dashboard
+      Navigator.pop(context);
     } catch (e) {
       String errorMsg = "Unknown error";
       if (e is FirebaseAuthException) {
@@ -62,72 +61,196 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       backgroundColor: AppTheme.primary,
       body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            gradient: AppTheme.cardGradient,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: AppTheme.softShadow,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Create Account", style: AppTheme.heading),
-              const SizedBox(height: 36),
-              InputField(
-                icon: Icons.person_rounded,
-                hint: 'Username',
-                isPassword: false,
-                controller: _usernameController,
-              ),
-              const SizedBox(height: 18),
-              InputField(
-                icon: Icons.email_rounded,
-                hint: 'Email',
-                isPassword: false,
-                controller: _emailController,
-              ),
-              const SizedBox(height: 18),
-              InputField(
-                icon: Icons.lock_rounded,
-                hint: 'Password',
-                isPassword: true,
-                controller: _passwordController,
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: AppTheme.neonButton,
-                  onPressed: _loading ? null : _register,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('REGISTER'),
-                ),
-              ),
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Text(
-                  "Already have an account?",
-                  style: AppTheme.body.copyWith(
-                    color: AppTheme.accent,
-                    decoration: TextDecoration.underline,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 120),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Text(
+                      "Create Account",
+                      style: AppTheme.heading.copyWith(
+                        color: Colors.white,
+                        fontSize: 24,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 38),
+                  Text(
+                    'Username',
+                    style: AppTheme.subheading.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _usernameController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: "Enter your username",
+                      hintStyle: AppTheme.body.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(
+                        Icons.person_outline,
+                        color: Colors.grey,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Email',
+                    style: AppTheme.subheading.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _emailController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: "Enter your email",
+                      hintStyle: AppTheme.body.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(
+                        Icons.email_outlined,
+                        color: Colors.grey,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Password',
+                    style: AppTheme.subheading.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      hintText: "Password",
+                      hintStyle: AppTheme.body.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(
+                        Icons.lock_outline,
+                        color: Colors.grey,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.secondary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 17),
+                        elevation: 0,
+                      ),
+                      onPressed: _loading ? null : _register,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : Text(
+                              'Create Account',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppTheme.accent,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Already have an account?",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: Text(
+                          "Sign in",
+                          style: AppTheme.body.copyWith(
+                            color: AppTheme.accent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 }
