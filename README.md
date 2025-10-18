@@ -14,13 +14,16 @@ A Flutter + Firebase starter with user authentication (login/register), configur
 - Web/Android/iOS enabled via Flutter tools
 
 ### 1. Clone the Repository
-git clone https://github.com/LJPathay/CCE106_Project.git
-cd CCE106_Projec
-
+- Run:
+  ```
+  git clone https://github.com/LJPathay/CCE106_Project.git
+  cd CCE106_Projec
+  ```
 
 ### 2. Install Dependencies
-flutter pub get
-
+ ```
+  flutter pub get
+ ```
 
 ### 3. Firebase Setup
 
@@ -38,15 +41,17 @@ Firebase is already pre-configured in `lib/firebase_options.dart` for web, Andro
 
 ### 4. Run the App
 
-- **Web:**  
+
+ ```
+  flutter run
+    or
+ Web: 
 flutter run -d chrome
-
-- **Android:**  
+Android:
 flutter run -d android
-
-- **iOS** (on macOS):  
+iOS(on macOS):  
 flutter run -d ios
-
+ ```
 
 ### 5. Using the App
 
