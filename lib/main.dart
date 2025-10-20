@@ -1,3 +1,4 @@
+import 'package:cce106_finance_project/auth/register.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,7 +9,7 @@ import '../UI/apply_loan.dart';
 import '../UI/make_payment.dart';
 import '../UI/view_history.dart';
 import '../UI/my_loans.dart';
-import 'firebase_options.dart'; // ✅ ADD THIS
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
           : '/dashboard',
       routes: {
         '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => const DashboardPage(),
         '/apply-loan': (context) => const ApplyLoanPage(),
         '/make-payment': (context) => const MakePaymentPage(),
