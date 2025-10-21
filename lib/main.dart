@@ -39,7 +39,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => const DashboardPage(),
-        '/apply-loan': (context) => const ApplyLoanPage(),
+        '/apply-loan': (context) => const LoanFormPage(),
         '/make-payment': (context) => const MakePaymentPage(),
         '/view-history': (context) => const ViewHistoryPage(),
         '/my-loans': (context) => const MyLoansPage(),
