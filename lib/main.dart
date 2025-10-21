@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../UI/theme.dart';
 import 'auth/login.dart';
-import '../UI/dashboard.dart';
+import '../UI/dashboard.dart'; // <- make sure class inside matches
 import '../UI/apply_loan.dart';
 import '../UI/make_payment.dart';
 import '../UI/view_history.dart';
@@ -30,9 +30,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         scaffoldBackgroundColor: AppTheme.primary,
         primaryColor: AppTheme.primary,
-        textTheme: TextTheme(
-          bodyMedium: AppTheme.body,
-        ), // ✅ Replace bodyText2 → bodyMedium (Flutter 3.10+)
+        textTheme: TextTheme(bodyMedium: AppTheme.body),
       ),
       initialRoute: FirebaseAuth.instance.currentUser == null
           ? '/login'
