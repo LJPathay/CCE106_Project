@@ -1,332 +1,437 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-class LoanFormPage extends StatefulWidget {
-  const LoanFormPage({Key? key}) : super(key: key);
+class ApplyLoanPage extends StatefulWidget {
+  const ApplyLoanPage({super.key});
 
   @override
-  _LoanFormPageState createState() => _LoanFormPageState();
+  State<ApplyLoanPage> createState() => _ApplyLoanPageState();
 }
 
-class _LoanFormPageState extends State<LoanFormPage>
+class _ApplyLoanPageState extends State<ApplyLoanPage>
     with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
-  double _loanAmount = 0.0;
-  int _monthsToPay = 1;
-  final double _interestRate = 0.2; // 20%
-  double _monthlyPayment = 0.0;
-  double _totalPayment = 0.0;
-  bool _showSuccessOverlay = false;
+  final TextEditingController _amountController = TextEditingController();
 
-  final currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱');
-  bool get _isOverLimit => _loanAmount > 50000;
+  final Map<String, Map<String, dynamic>> _loanTerms = {
+    '7 days - 15%': {'months': 0.23, 'interestRate': 15.0, 'label': '7 days'},
+    '14 days - 12%': {'months': 0.47, 'interestRate': 12.0, 'label': '14 days'},
+    '1 month - 8%': {'months': 1, 'interestRate': 8.0, 'label': '1 month'},
+    '3 months - 5%': {'months': 3, 'interestRate': 5.0, 'label': '3 months'},
+    '6 months - 4%': {'months': 6, 'interestRate': 4.0, 'label': '6 months'},
+    '12 months - 3.5%': {
+      'months': 12,
+      'interestRate': 3.5,
+      'label': '12 months',
+    },
+    '24 months - 3%': {'months': 24, 'interestRate': 3.0, 'label': '24 months'},
+  };
+  String _selectedTerm = '3 months - 5%';
 
-  void _calculateLoan() {
-    if (_loanAmount > 0 && !_isOverLimit) {
-      final totalInterest = _loanAmount * _interestRate;
-      _totalPayment = _loanAmount + totalInterest;
-      _monthlyPayment = _totalPayment / _monthsToPay;
-    } else {
-      _totalPayment = 0.0;
-      _monthlyPayment = 0.0;
-    }
+  final List<String> _loanPurposes = [
+    'Personal/Emergency',
+    'Medical Expenses',
+    'Education',
+    'Home Improvement',
+    'Business Capital',
+    'Debt Consolidation',
+    'Travel',
+    'Wedding',
+    'Vehicle Purchase',
+    'Others',
+  ];
+  String _selectedPurpose = 'Personal/Emergency';
+
+  double _monthly = 0.0;
+  double _total = 0.0;
+  double _currentMonths = 3.0;
+  bool _showSummary = false;
+
+  late final AnimationController _anim;
+  late final Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fade = CurvedAnimation(parent: _anim, curve: Curves.easeInOut);
   }
 
-  void _onSubmit() {
-    if (_formKey.currentState!.validate() && !_isOverLimit) {
-      _formKey.currentState!.save();
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _anim.dispose();
+    super.dispose();
+  }
 
-      setState(() => _showSuccessOverlay = true);
+  String _formatPeso(double v) => '₱${v.toStringAsFixed(2)}';
 
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() => _showSuccessOverlay = false);
-          Navigator.pushReplacementNamed(context, '/dashboard');
-        }
+  void _calculate() {
+    final a = double.tryParse(_amountController.text) ?? 0.0;
+    if (a <= 0) {
+      setState(() {
+        _showSummary = false;
+        _monthly = 0.0;
+        _total = 0.0;
+        _currentMonths = 0.0;
       });
+      return;
     }
+    final termData = _loanTerms[_selectedTerm]!;
+    final months = termData['months'] as double;
+    final interestRate = termData['interestRate'] as double;
+
+    double total;
+    if (months < 1) {
+      total = a * (1 + (interestRate / 100));
+    } else {
+      final rate = interestRate / 100;
+      total = a * pow((1 + rate), months);
+    }
+    final monthly = months < 1 ? total : total / months;
+    setState(() {
+      _total = total;
+      _monthly = monthly;
+      _showSummary = true;
+      _currentMonths = months;
+    });
+    _anim.forward();
   }
 
   @override
   Widget build(BuildContext context) {
-    _calculateLoan();
+    final termData = _loanTerms[_selectedTerm]!;
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: Colors.grey[100],
-          appBar: AppBar(
-            title: const Text(
-              "Apply for a Loan",
-              style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0.5,
+        title: const Text(
+          'Apply for a Loan',
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Loan Amount input
+          const Text(
+            'Loan Amount',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black, // high-contrast label!
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _amountController,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: Colors.black87,
+              ),
+              hintText: 'Enter loan amount (max ₱50,000)',
+              hintStyle: TextStyle(color: Colors.grey[700]),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            centerTitle: true,
-            backgroundColor: Colors.white,
-            elevation: 1,
-            iconTheme: const IconThemeData(color: Colors.black),
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+            onChanged: (_) => _calculate(),
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              onChanged: () => setState(() => _calculateLoan()),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Loan Amount Field
-                  Text(
-                    "Loan Amount",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: "Enter loan amount (max ₱50,000)",
-                      hintStyle: TextStyle(color: Colors.grey[500]),
-                      prefixIcon: Icon(
-                        Icons.payments_rounded,
-                        color: Colors.grey[700],
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: _isOverLimit
-                              ? Colors.red
-                              : Colors.grey.shade300, // red if over limit
-                          width: 1.3,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: _isOverLimit
-                              ? Colors.red
-                              : Colors.blueAccent, // red if over limit
-                          width: 1.6,
-                        ),
-                      ),
-                    ),
-                    validator: (value) {
-                      final amount = double.tryParse(value ?? '') ?? 0;
-                      if (amount <= 0) return "Enter a valid loan amount.";
-                      if (amount > 50000) return "Maximum loan is ₱50,000.";
-                      return null;
-                    },
-                    onSaved: (value) =>
-                        _loanAmount = double.parse(value ?? '0'),
-                    onChanged: (value) {
-                      setState(() {
-                        _loanAmount = double.tryParse(value) ?? 0;
-                      });
-                    },
-                  ),
+          const SizedBox(height: 16),
 
-                  // ⚠️ Warning Message
-                  if (_isOverLimit)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: const [
-                          Icon(
-                            Icons.warning_amber_rounded,
-                            color: Colors.red,
-                            size: 18,
+          // Repayment term dropdown
+          const Text(
+            'Repayment Term & Interest',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black, // high-contrast
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedTerm,
+                isExpanded: true,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.black87,
+                ),
+                items: _loanTerms.keys.map((term) {
+                  return DropdownMenuItem<String>(
+                    value: term,
+                    child: Text(
+                      term,
+                      style: const TextStyle(fontSize: 16, color: Colors.black),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedTerm = value);
+                    _calculate();
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Reason dropdown
+          const Text(
+            'Purpose of Loan',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedPurpose,
+                isExpanded: true,
+                icon: const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.black87,
+                ),
+                items: _loanPurposes.map((purpose) {
+                  return DropdownMenuItem<String>(
+                    value: purpose,
+                    child: Text(
+                      purpose,
+                      style: const TextStyle(fontSize: 16, color: Colors.black),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedPurpose = value);
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          if (_showSummary)
+            FadeTransition(
+              opacity: _fade,
+              child: Card(
+                elevation: 3,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Loan Summary',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Loan Amount:',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                          SizedBox(width: 6),
+                          Text(
+                            _formatPeso(
+                              double.tryParse(_amountController.text) ?? 0.0,
+                            ),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Term:',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            termData['label'],
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Interest Rate:',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '${termData['interestRate']}%',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Purpose:',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           Flexible(
                             child: Text(
-                              "Maximum loan limit is ₱50,000.",
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                              _selectedPurpose,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
+                              textAlign: TextAlign.right,
                             ),
                           ),
                         ],
                       ),
-                    ),
-
-                  const SizedBox(height: 20),
-
-                  // Months to Pay Dropdown
-                  Text(
-                    "Months to Pay",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: DropdownButtonFormField<int>(
-                      value: _monthsToPay,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                      ),
-                      dropdownColor: Colors.white,
-                      iconEnabledColor: Colors.grey[700],
-                      style: TextStyle(color: Colors.grey[800], fontSize: 15),
-                      items: List.generate(
-                        12,
-                        (index) => DropdownMenuItem(
-                          value: index + 1,
-                          child: Text(
-                            "${index + 1} month${index > 0 ? 's' : ''}",
-                          ),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _monthsToPay = value ?? 1;
-                          _calculateLoan();
-                        });
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // Auto Calculation Card
-                  Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 3,
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Loan Summary",
-                            style: TextStyle(
+                            _currentMonths < 1
+                                ? 'Amount due:'
+                                : 'Monthly Payment:',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            _formatPeso(_monthly),
+                            style: const TextStyle(
+                              color: Colors.blue,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
-                              color: Colors.grey[900],
-                            ),
-                          ),
-                          Divider(color: Colors.grey[300], height: 20),
-                          Text(
-                            "Interest Rate: 20% (Fixed)",
-                            style: TextStyle(color: Colors.grey[800]),
-                          ),
-                          Text(
-                            "Months to Pay: $_monthsToPay",
-                            style: TextStyle(color: Colors.grey[800]),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Monthly Payment: ${currency.format(_monthlyPayment)}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                          Text(
-                            "Total Payment: ${currency.format(_totalPayment)}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.green,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // Request Loan Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isOverLimit ? null : _onSubmit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isOverLimit
-                            ? Colors.grey
-                            : Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 3,
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      child: const Text("Request Loan"),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ✅ Success Overlay Animation
-        if (_showSuccessOverlay)
-          AnimatedOpacity(
-            opacity: _showSuccessOverlay ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 400),
-            child: Container(
-              color: Colors.black.withOpacity(0.6),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(30),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.check_circle, color: Colors.green, size: 80),
-                      SizedBox(height: 15),
-                      Text(
-                        "Loan Request Successful!",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total Payment:',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            _formatPeso(_total),
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
             ),
+          const SizedBox(height: 24),
+
+          ElevatedButton(
+            onPressed: () {
+              _calculate();
+              if (_showSummary) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Loan application submitted!\nAmount: ${_formatPeso(double.tryParse(_amountController.text) ?? 0.0)}\nPurpose: $_selectedPurpose',
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4B56E9),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 2,
+            ),
+            child: const Text(
+              'Apply for Loan',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -4,7 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../UI/theme.dart';
 import 'auth/login.dart';
-import '../UI/dashboard.dart'; // <- make sure class inside matches
+import '../UI/dashboard.dart';
 import '../UI/apply_loan.dart';
 import '../UI/make_payment.dart';
 import '../UI/view_history.dart';
@@ -39,7 +39,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/dashboard': (context) => const DashboardPage(),
-        '/apply-loan': (context) => const LoanFormPage(),
+        '/apply-loan': (context) => const ApplyLoanPage(),
         '/make-payment': (context) => const MakePaymentPage(),
         '/view-history': (context) => const ViewHistoryPage(),
         '/my-loans': (context) => const MyLoansPage(),
