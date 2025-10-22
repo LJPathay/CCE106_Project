@@ -41,49 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBqJgH1nXKhV5QDNbWC8Tm987DusxOZHCQ',
-    appId: '1:810245578711:web:7c5439f08ecf0aca38b592',
-    messagingSenderId: '810245578711',
-    projectId: 'cce-106-project',
-    authDomain: 'cce-106-project.firebaseapp.com',
-    storageBucket: 'cce-106-project.firebasestorage.app',
-    measurementId: 'G-L1N9P74DB7',
+    apiKey: 'AIzaSyDwNS-s8dKj3PAoQ2R_fuzXkMi3hjHSIZ4',
+    appId: '1:990335661569:web:d76918671f1e142551f200',
+    messagingSenderId: '990335661569',
+    projectId: 'cce106proj',
+    authDomain: 'cce106proj.firebaseapp.com',
+    storageBucket: 'cce106proj.firebasestorage.app',
+    measurementId: 'G-J74FKWF3ZM',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCp-rXv2v_vorNdqHJsp0RuMePXjDj3gYs',
-    appId: '1:810245578711:android:60b643a782927c2038b592',
-    messagingSenderId: '810245578711',
-    projectId: 'cce-106-project',
-    storageBucket: 'cce-106-project.firebasestorage.app',
+    apiKey: 'AIzaSyBppp7DbTDGuOwNIYMyYFViamTYAte2rmc',
+    appId: '1:990335661569:android:10a38d664c425fd051f200',
+    messagingSenderId: '990335661569',
+    projectId: 'cce106proj',
+    storageBucket: 'cce106proj.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCbXI0DKbGuOyM7QfQ3SleUWXJ_htAg5_k',
-    appId: '1:810245578711:ios:0fb6607b6ff8fd6138b592',
-    messagingSenderId: '810245578711',
-    projectId: 'cce-106-project',
-    storageBucket: 'cce-106-project.firebasestorage.app',
+    apiKey: 'AIzaSyDdf2twPGgBKfED6kxFIGfOMCKTswZeAxs',
+    appId: '1:990335661569:ios:bee7d8e1b19c095a51f200',
+    messagingSenderId: '990335661569',
+    projectId: 'cce106proj',
+    storageBucket: 'cce106proj.firebasestorage.app',
     iosBundleId: 'com.example.cce106FinanceProject',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCbXI0DKbGuOyM7QfQ3SleUWXJ_htAg5_k',
-    appId: '1:810245578711:ios:0fb6607b6ff8fd6138b592',
-    messagingSenderId: '810245578711',
-    projectId: 'cce-106-project',
-    storageBucket: 'cce-106-project.firebasestorage.app',
+    apiKey: 'AIzaSyDdf2twPGgBKfED6kxFIGfOMCKTswZeAxs',
+    appId: '1:990335661569:ios:bee7d8e1b19c095a51f200',
+    messagingSenderId: '990335661569',
+    projectId: 'cce106proj',
+    storageBucket: 'cce106proj.firebasestorage.app',
     iosBundleId: 'com.example.cce106FinanceProject',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBqJgH1nXKhV5QDNbWC8Tm987DusxOZHCQ',
-    appId: '1:810245578711:web:54c88e5e31f3a35f38b592',
-    messagingSenderId: '810245578711',
-    projectId: 'cce-106-project',
-    authDomain: 'cce-106-project.firebaseapp.com',
-    storageBucket: 'cce-106-project.firebasestorage.app',
-    measurementId: 'G-G82DVGHR3G',
+    apiKey: 'AIzaSyDwNS-s8dKj3PAoQ2R_fuzXkMi3hjHSIZ4',
+    appId: '1:990335661569:web:3c78a0e9950129dc51f200',
+    messagingSenderId: '990335661569',
+    projectId: 'cce106proj',
+    authDomain: 'cce106proj.firebaseapp.com',
+    storageBucket: 'cce106proj.firebasestorage.app',
+    measurementId: 'G-68PXC4VJJP',
   );
 
 }

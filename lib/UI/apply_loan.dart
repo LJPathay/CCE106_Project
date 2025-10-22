@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class LoanFormPage extends StatefulWidget {
-  const LoanFormPage({Key? key}) : super(key: key);
+  const LoanFormPage({super.key});
 
   @override
   _LoanFormPageState createState() => _LoanFormPageState();
@@ -184,7 +184,7 @@ class _LoanFormPageState extends State<LoanFormPage>
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: DropdownButtonFormField<int>(
-                      value: _monthsToPay,
+                      initialValue: _monthsToPay,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                       ),

@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "810245578711",
-    "project_id": "cce-106-project",
-    "storage_bucket": "cce-106-project.firebasestorage.app"
+    "project_number": "990335661569",
+    "project_id": "cce106proj",
+    "storage_bucket": "cce106proj.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:810245578711:android:60b643a782927c2038b592",
+        "mobilesdk_app_id": "1:990335661569:android:10a38d664c425fd051f200",
         "android_client_info": {
           "package_name": "com.example.cce106_finance_project"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCp-rXv2v_vorNdqHJsp0RuMePXjDj3gYs"
+          "current_key": "AIzaSyBppp7DbTDGuOwNIYMyYFViamTYAte2rmc"
         }
       ],
       "services": {
