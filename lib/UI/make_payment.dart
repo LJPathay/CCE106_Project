@@ -15,19 +15,25 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
   final List<String> paymentMethods = ["Bank Transfer", "GCash", "Credit Card"];
   String? _selectedMethod;
 
+  static const Color _accentPink = Color(0xFFD81B60);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6), // light creamy theme
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0.5,
-        iconTheme: const IconThemeData(color: Colors.black),
-        title: Text(
-          'Make Payment',
-          style: AppTheme.heading.copyWith(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
+        elevation: 1,
+        title: ShaderMask(
+          shaderCallback: (bounds) =>
+              AppTheme.instagramGradient.createShader(bounds),
+          child: const Text(
+            'Make Payment',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
           ),
         ),
       ),
@@ -65,7 +71,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                   alignment: Alignment.center,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.purple[500],
+                    color: _accentPink,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
@@ -88,7 +94,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                             icon: Icon(
                               Icons.qr_code_scanner,
                               size: 34,
-                              color: Colors.purple[300],
+                              color: _accentPink.withOpacity(0.7),
                             ),
                             onPressed: () {},
                           ),
@@ -109,7 +115,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                             icon: Icon(
                               Icons.content_paste,
                               size: 34,
-                              color: Colors.pink[300],
+                              color: _accentPink.withOpacity(0.7),
                             ),
                             onPressed: () {},
                           ),
@@ -183,7 +189,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                 const SizedBox(height: 4),
                 ...paymentMethods.map(
                   (m) => RadioListTile<String>(
-                    activeColor: Colors.purple,
+                    activeColor: _accentPink,
                     title: Text(m, style: AppTheme.body),
                     value: m,
                     groupValue: _selectedMethod,
@@ -195,7 +201,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple[500],
+                      backgroundColor: _accentPink,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(22),
@@ -211,7 +217,7 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                             'Payment sent: ${_amountController.text}, via ${_selectedMethod ?? ''}',
                             style: const TextStyle(color: Colors.white),
                           ),
-                          backgroundColor: Colors.purple[400],
+                          backgroundColor: _accentPink,
                         ),
                       );
                       _amountController.clear();

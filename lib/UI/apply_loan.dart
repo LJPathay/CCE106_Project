@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../UI/theme.dart';
 
 class ApplyLoanPage extends StatefulWidget {
   const ApplyLoanPage({super.key});
@@ -48,6 +49,8 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
 
   late final AnimationController _anim;
   late final Animation<double> _fade;
+
+  static const Color _accentPink = Color(0xFFD81B60);
 
   @override
   void initState() {
@@ -108,11 +111,18 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-        title: const Text(
-          'Apply for a Loan',
-          style: TextStyle(color: Colors.black),
+        elevation: 1,
+        title: ShaderMask(
+          shaderCallback: (bounds) =>
+              AppTheme.instagramGradient.createShader(bounds),
+          child: const Text(
+            'Apply for a Loan',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
         ),
       ),
       body: ListView(
@@ -411,13 +421,13 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                     content: Text(
                       'Loan application submitted!\nAmount: ${_formatPeso(double.tryParse(_amountController.text) ?? 0.0)}\nPurpose: $_selectedPurpose',
                     ),
-                    backgroundColor: Colors.green,
+                    backgroundColor: _accentPink,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4B56E9),
+              backgroundColor: _accentPink,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
