@@ -46,6 +46,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
   double _total = 0.0;
   double _currentMonths = 3.0;
   bool _showSummary = false;
+  bool _acceptedTerms = false;
 
   late final AnimationController _anim;
   late final Animation<double> _fade;
@@ -248,6 +249,57 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
           ),
           const SizedBox(height: 20),
 
+          // Monthly Payments box (matches wireframe large area)
+          const Text(
+            'Monthly Payments',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Center(
+              child: Text(
+                _showSummary
+                    ? (_currentMonths < 1
+                          ? 'Amount due: ${_formatPeso(_monthly)}'
+                          : 'Monthly: ${_formatPeso(_monthly)}')
+                    : 'Enter amount and select terms',
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Terms & Conditions
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _acceptedTerms,
+            activeColor: _accentPink,
+            onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+            title: const Text(
+              'Terms and Conditions',
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+
           if (_showSummary)
             FadeTransition(
               opacity: _fade,
@@ -413,19 +465,21 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
           const SizedBox(height: 24),
 
           ElevatedButton(
-            onPressed: () {
-              _calculate();
-              if (_showSummary) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Loan application submitted!\nAmount: ${_formatPeso(double.tryParse(_amountController.text) ?? 0.0)}\nPurpose: $_selectedPurpose',
-                    ),
-                    backgroundColor: _accentPink,
-                  ),
-                );
-              }
-            },
+            onPressed: (!_acceptedTerms)
+                ? null
+                : () {
+                    _calculate();
+                    if (_showSummary) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Loan application submitted!\nAmount: ${_formatPeso(double.tryParse(_amountController.text) ?? 0.0)}\nPurpose: $_selectedPurpose',
+                          ),
+                          backgroundColor: _accentPink,
+                        ),
+                      );
+                    }
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: _accentPink,
               foregroundColor: Colors.white,

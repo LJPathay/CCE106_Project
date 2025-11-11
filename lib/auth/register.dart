@@ -113,13 +113,13 @@ class _RegisterPageState extends State<RegisterPage> {
                   child: const Text(
                     'Create Account',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
                 Form(
                   key: _formKey,
                   child: Column(
@@ -250,7 +250,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           TextButton(
                             onPressed: () => Navigator.pop(context),
                             child: Text(
-                              'Sign in',
+                              'Login Here',
                               style: TextStyle(
                                 color: Colors.purple.shade400,
                                 fontWeight: FontWeight.bold,
