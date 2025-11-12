@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../UI/theme.dart';
+import '../Services/firebase_service.dart';
+import '../Models/Loan.dart';
+import '../Models/Payment.dart';
+import 'package:intl/intl.dart';
 
 const Color darkPink = Color(0xFFD81B60);
 
@@ -14,12 +18,51 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   // For avatar tap animation
   bool _avatarPressed = false;
+  final FirebaseService _firebaseService = FirebaseService();
+
+  double _currentBalance = 0.0;
+  DateTime? _nextPaymentDue;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load initial data
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final balance = await _firebaseService.getCurrentBalance();
+      final nextDue = await _firebaseService.getNextPaymentDue();
+
+      if (mounted) {
+        setState(() {
+          _currentBalance = balance;
+          _nextPaymentDue = nextDue;
+        });
+      }
+    } catch (e) {
+      // Handle error silently or show a message
+      if (mounted) {
+        debugPrint('Error loading dashboard data: $e');
+      }
+    }
+  }
 
   String _getUsername(String? email) {
     if (email == null) return "User";
     final local = email.split('@')[0];
     if (local.isEmpty) return "User";
     return local[0].toUpperCase() + local.substring(1);
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return "No upcoming payments";
+    return DateFormat('MMM dd, yyyy').format(date);
+  }
+
+  String _formatCurrency(double amount) {
+    return '₱${amount.toStringAsFixed(2)}';
   }
 
   void _showProfileMenu(TapDownDetails details) async {
@@ -40,6 +83,16 @@ class _DashboardPageState extends State<DashboardPage> {
               Icon(Icons.person_outline),
               SizedBox(width: 6),
               Text("Profile"),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'verification',
+          child: Row(
+            children: const [
+              Icon(Icons.verified_user_outlined),
+              SizedBox(width: 6),
+              Text("Verification"),
             ],
           ),
         ),
@@ -80,6 +133,8 @@ class _DashboardPageState extends State<DashboardPage> {
         await FirebaseAuth.instance.signOut();
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, "/login");
+      } else if (value == 'verification') {
+        Navigator.pushNamed(context, "/verification");
       }
     });
   }
@@ -205,7 +260,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
             _dashboardCard(
               title: "Current Balance",
-              subtitle: "\$10,000",
+              subtitle: _formatCurrency(_currentBalance),
               icon: Icons.account_balance_wallet_outlined,
               cta: "View Details",
               cardMinHeight: 78, // min height but can grow
@@ -214,11 +269,13 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 8),
             _dashboardCard(
               title: "Next Payment Due",
-              subtitle: "Nov 05, 2025",
+              subtitle: _formatDate(_nextPaymentDue),
               icon: Icons.event_outlined,
               cta: "Pay Now",
               cardMinHeight: 78,
-              onTap: () {},
+              onTap: () {
+                Navigator.pushNamed(context, "/make-payment");
+              },
             ),
             const SizedBox(height: 8),
 
@@ -237,35 +294,131 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const SizedBox(height: 6),
 
-            _dashboardCard(
-              title: "Recent Activity",
-              subtitle: "Loan approved · Payment sent",
-              icon: Icons.history_outlined,
-              notifications: [
-                _activityBadge(
-                  "Approved",
-                  Colors.green,
-                  Icons.check_circle_outline,
-                ),
-                _activityBadge("Paid", Colors.blue, Icons.payment_outlined),
-                _activityBadge(
-                  "Overdue",
-                  Colors.red,
-                  Icons.warning_amber_rounded,
-                ),
-              ],
-              showArrow: true,
-              cardMinHeight: 92,
-              onTap: () {},
+            StreamBuilder<List<Loan>>(
+              stream: _firebaseService.getUserLoans(),
+              builder: (context, loansSnapshot) {
+                return StreamBuilder<List<Payment>>(
+                  stream: _firebaseService.getUserPayments(),
+                  builder: (context, paymentsSnapshot) {
+                    List<Widget> badges = [];
+
+                    // Check for approved loans
+                    if (loansSnapshot.hasData) {
+                      final hasApproved = loansSnapshot.data!.any(
+                        (loan) => loan.status == 'approved',
+                      );
+                      if (hasApproved) {
+                        badges.add(
+                          _activityBadge(
+                            "Approved",
+                            Colors.green,
+                            Icons.check_circle_outline,
+                          ),
+                        );
+                      }
+                    }
+
+                    // Check for payments
+                    if (paymentsSnapshot.hasData &&
+                        paymentsSnapshot.data!.isNotEmpty) {
+                      badges.add(
+                        _activityBadge(
+                          "Paid",
+                          Colors.blue,
+                          Icons.payment_outlined,
+                        ),
+                      );
+                    }
+
+                    // Check for overdue loans
+                    if (loansSnapshot.hasData) {
+                      final now = DateTime.now();
+                      final hasOverdue = loansSnapshot.data!.any(
+                        (loan) =>
+                            loan.nextPaymentDue != null &&
+                            loan.nextPaymentDue!.isBefore(now) &&
+                            loan.status != 'completed',
+                      );
+                      if (hasOverdue) {
+                        badges.add(
+                          _activityBadge(
+                            "Overdue",
+                            Colors.red,
+                            Icons.warning_amber_rounded,
+                          ),
+                        );
+                      }
+                    }
+
+                    String subtitle = "No recent activity";
+                    if (loansSnapshot.hasData && paymentsSnapshot.hasData) {
+                      final recentLoans = loansSnapshot.data!
+                          .where(
+                            (l) =>
+                                l.status == 'approved' || l.status == 'active',
+                          )
+                          .length;
+                      final recentPayments = paymentsSnapshot.data!.length;
+                      if (recentLoans > 0 || recentPayments > 0) {
+                        List<String> activities = [];
+                        if (recentLoans > 0) activities.add("Loan approved");
+                        if (recentPayments > 0) activities.add("Payment sent");
+                        subtitle = activities.join(" · ");
+                      }
+                    } else if (loansSnapshot.hasData) {
+                      final recentLoans = loansSnapshot.data!
+                          .where(
+                            (l) =>
+                                l.status == 'approved' || l.status == 'active',
+                          )
+                          .length;
+                      if (recentLoans > 0) {
+                        subtitle = "Loan approved";
+                      }
+                    } else if (paymentsSnapshot.hasData &&
+                        paymentsSnapshot.data!.isNotEmpty) {
+                      subtitle = "Payment sent";
+                    }
+
+                    return _dashboardCard(
+                      title: "Recent Activity",
+                      subtitle: subtitle,
+                      icon: Icons.history_outlined,
+                      notifications: badges,
+                      showArrow: true,
+                      cardMinHeight: 92,
+                      onTap: () {
+                        Navigator.pushNamed(context, "/view-history");
+                      },
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 8),
-            _dashboardCard(
-              title: "Loan Summary",
-              subtitle: "Active Loans: 2   Borrowed: \$8,000   Paid: \$2,200",
-              icon: Icons.summarize,
-              trailingWidget: _progressIndicator(0.28),
-              cardMinHeight: 100,
-              onTap: () {},
+            StreamBuilder<Map<String, dynamic>>(
+              stream: _firebaseService.getLoanSummaryStream(),
+              builder: (context, summarySnapshot) {
+                final summary =
+                    summarySnapshot.data ??
+                    {'activeLoans': 0, 'totalBorrowed': 0.0, 'totalPaid': 0.0};
+
+                return _dashboardCard(
+                  title: "Loan Summary",
+                  subtitle:
+                      "Active Loans: ${summary['activeLoans']}   Borrowed: ${_formatCurrency(summary['totalBorrowed'])}   Paid: ${_formatCurrency(summary['totalPaid'])}",
+                  icon: Icons.summarize,
+                  trailingWidget: summary['totalBorrowed'] > 0
+                      ? _progressIndicator(
+                          summary['totalPaid'] / summary['totalBorrowed'],
+                        )
+                      : _progressIndicator(0.0),
+                  cardMinHeight: 100,
+                  onTap: () {
+                    Navigator.pushNamed(context, "/my-loans");
+                  },
+                );
+              },
             ),
             const SizedBox(height: 12),
           ],

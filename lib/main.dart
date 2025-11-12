@@ -9,6 +9,7 @@ import '../UI/apply_loan.dart';
 import '../UI/make_payment.dart';
 import '../UI/view_history.dart';
 import '../UI/my_loans.dart';
+import '../UI/verification_page.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -43,6 +44,7 @@ class MyApp extends StatelessWidget {
         '/make-payment': (context) => const MakePaymentPage(),
         '/view-history': (context) => const ViewHistoryPage(),
         '/my-loans': (context) => const MyLoansPage(),
+        '/verification': (context) => const VerificationPage(),
       },
     );
   }

@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
 import '../UI/theme.dart';
+import '../Services/firebase_service.dart';
+import '../Models/Loan.dart';
+import '../Models/Payment.dart';
+import 'package:intl/intl.dart';
 
-class ViewHistoryPage extends StatelessWidget {
+class ViewHistoryPage extends StatefulWidget {
   const ViewHistoryPage({super.key});
 
-  static const Color _accentPink = Color(0xFFD81B60);
+  @override
+  State<ViewHistoryPage> createState() => _ViewHistoryPageState();
+}
+
+class _ViewHistoryPageState extends State<ViewHistoryPage> {
+  final FirebaseService _firebaseService = FirebaseService();
+
+  String _formatCurrency(double amount) {
+    return '₱${amount.toStringAsFixed(2)}';
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat('MMM dd, yyyy').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,88 +43,147 @@ class ViewHistoryPage extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        children: [
-          Text(
-            '🧾 Recent Activity',
-            style: AppTheme.subheading.copyWith(
-              color: const Color(0xFF727272),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _HistoryTile(
-            color: Colors.green,
-            icon: Icons.check_circle_outline,
-            title: 'Loan Approved',
-            subtitle: 'Personal Loan • Oct 22, 2025',
-            amountText: '+ ₱5,000',
-          ),
-          _HistoryTile(
-            color: Colors.blue,
-            icon: Icons.payment_outlined,
-            title: 'Payment Sent',
-            subtitle: 'Education Loan • Nov 01, 2025',
-            amountText: '− ₱800',
-          ),
-          _HistoryTile(
-            color: Colors.orange,
-            icon: Icons.edit_calendar_outlined,
-            title: 'Due Date Updated',
-            subtitle: 'Personal Loan • Oct 28, 2025',
-            amountText: '',
-          ),
-          _HistoryTile(
-            color: Colors.red,
-            icon: Icons.warning_amber_outlined,
-            title: 'Overdue Warning',
-            subtitle: 'Education Loan • Oct 15, 2025',
-            amountText: '',
-          ),
-          const SizedBox(height: 16),
-          Divider(color: Colors.grey.shade200, height: 22, thickness: 1),
-          const SizedBox(height: 4),
-          Text(
-            'Filters',
-            style: AppTheme.subheading.copyWith(
-              color: const Color(0xFF727272),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: const [
-              _FilterChip(label: 'All'),
-              _FilterChip(label: 'Payments'),
-              _FilterChip(label: 'Approvals'),
-              _FilterChip(label: 'Overdue'),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _accentPink,
-                side: const BorderSide(color: _accentPink, width: 1.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
+      body: StreamBuilder<List<Loan>>(
+        stream: _firebaseService.getUserLoans(),
+        builder: (context, loansSnapshot) {
+          return StreamBuilder<List<Payment>>(
+            stream: _firebaseService.getUserPayments(),
+            builder: (context, paymentsSnapshot) {
+              if (!loansSnapshot.hasData && !paymentsSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final loans = loansSnapshot.data ?? [];
+              final payments = paymentsSnapshot.data ?? [];
+
+              // Combine loans and payments into history items
+              List<_HistoryItem> historyItems = [];
+
+              // Add loan applications (pending, approved, etc.)
+              for (var loan in loans) {
+                if (loan.status == 'approved' || loan.status == 'active') {
+                  historyItems.add(
+                    _HistoryItem(type: 'approval', loan: loan, payment: null),
+                  );
+                } else if (loan.status == 'pending') {
+                  // Show pending loans as "Loan Application"
+                  historyItems.add(
+                    _HistoryItem(
+                      type: 'application',
+                      loan: loan,
+                      payment: null,
+                    ),
+                  );
+                }
+                // Add overdue warnings
+                if (loan.nextPaymentDue != null &&
+                    loan.nextPaymentDue!.isBefore(DateTime.now()) &&
+                    loan.status != 'completed') {
+                  historyItems.add(
+                    _HistoryItem(type: 'overdue', loan: loan, payment: null),
+                  );
+                }
+              }
+
+              // Add payments
+              for (var payment in payments) {
+                historyItems.add(
+                  _HistoryItem(type: 'payment', loan: null, payment: payment),
+                );
+              }
+
+              // Sort by date (most recent first)
+              historyItems.sort((a, b) {
+                DateTime aDate =
+                    a.payment?.createdAt ?? a.loan?.createdAt ?? DateTime.now();
+                DateTime bDate =
+                    b.payment?.createdAt ?? b.loan?.createdAt ?? DateTime.now();
+                return bDate.compareTo(aDate);
+              });
+
+              return ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              onPressed: () {},
-              child: const Text(
-                'Export History',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-              ),
-            ),
-          ),
-        ],
+                children: [
+                  Text(
+                    '🧾 Recent Activity',
+                    style: AppTheme.subheading.copyWith(
+                      color: const Color(0xFF727272),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (historyItems.isEmpty)
+                    Card(
+                      color: Colors.white,
+                      elevation: 1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade300, width: 1),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Center(
+                          child: Text(
+                            'No history available',
+                            style: AppTheme.body.copyWith(
+                              color: Colors.black54,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...historyItems.map((item) {
+                      if (item.type == 'payment') {
+                        return _HistoryTile(
+                          color: Colors.blue,
+                          icon: Icons.payment_outlined,
+                          title: 'Payment Sent',
+                          subtitle:
+                              '${item.payment!.paymentMethod} • ${_formatDate(item.payment!.createdAt)}',
+                          amountText:
+                              '− ${_formatCurrency(item.payment!.amount)}',
+                        );
+                      } else if (item.type == 'approval') {
+                        return _HistoryTile(
+                          color: Colors.green,
+                          icon: Icons.check_circle_outline,
+                          title: 'Loan Approved',
+                          subtitle:
+                              '${item.loan!.purpose} • ${_formatDate(item.loan!.createdAt)}',
+                          amountText: '+ ${_formatCurrency(item.loan!.amount)}',
+                        );
+                      } else if (item.type == 'application') {
+                        return _HistoryTile(
+                          color: Colors.orange,
+                          icon: Icons.pending_outlined,
+                          title: 'Loan Application',
+                          subtitle:
+                              '${item.loan!.purpose} • ${_formatDate(item.loan!.createdAt)}',
+                          amountText: '+ ${_formatCurrency(item.loan!.amount)}',
+                        );
+                      } else if (item.type == 'overdue') {
+                        return _HistoryTile(
+                          color: Colors.red,
+                          icon: Icons.warning_amber_outlined,
+                          title: 'Overdue Warning',
+                          subtitle:
+                              '${item.loan!.purpose} • ${_formatDate(item.loan!.nextPaymentDue!)}',
+                          amountText: '',
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }),
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -170,29 +246,10 @@ class _HistoryTile extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label});
-  final String label;
+class _HistoryItem {
+  final String type; // 'payment', 'approval', 'application', 'overdue'
+  final Loan? loan;
+  final Payment? payment;
 
-  static const Color _accentPink = Color(0xFFD81B60);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: _accentPink.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _accentPink.withOpacity(0.25)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: _accentPink,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  _HistoryItem({required this.type, this.loan, this.payment});
 }

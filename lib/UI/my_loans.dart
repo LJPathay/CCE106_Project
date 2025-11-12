@@ -1,10 +1,28 @@
 import 'package:flutter/material.dart';
 import '../UI/theme.dart';
+import '../Services/firebase_service.dart';
+import '../Models/Loan.dart';
+import 'package:intl/intl.dart';
 
-class MyLoansPage extends StatelessWidget {
+class MyLoansPage extends StatefulWidget {
   const MyLoansPage({super.key});
 
+  @override
+  State<MyLoansPage> createState() => _MyLoansPageState();
+}
+
+class _MyLoansPageState extends State<MyLoansPage> {
   static const Color _accentPink = Color(0xFFD81B60);
+  final FirebaseService _firebaseService = FirebaseService();
+
+  String _formatCurrency(double amount) {
+    return '₱${amount.toStringAsFixed(2)}';
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return "No due date";
+    return DateFormat('MMM dd, yyyy').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,73 +44,85 @@ class MyLoansPage extends StatelessWidget {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        children: [
-          Text(
-            '📄 Active Loans',
-            style: AppTheme.subheading.copyWith(
-              color: const Color(0xFF727272),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _LoanCard(
-            title: 'Personal Loan',
-            subtitle: 'Borrowed: ₱5,000  •  Remaining: ₱3,600',
-            progress: 0.28,
-            dueLabel: 'Next due: Nov 12, 2025',
-          ),
-          const SizedBox(height: 10),
-          _LoanCard(
-            title: 'Education Loan',
-            subtitle: 'Borrowed: ₱3,000  •  Remaining: ₱1,950',
-            progress: 0.35,
-            dueLabel: 'Next due: Nov 20, 2025',
-          ),
-          const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade200, height: 22, thickness: 1),
-          const SizedBox(height: 4),
-          Text(
-            '📝 Recent Payments',
-            style: AppTheme.subheading.copyWith(
-              color: const Color(0xFF727272),
-              fontSize: 14.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          _PaymentTile(
-            icon: Icons.payment_outlined,
-            title: '₱800 · Education Loan',
-            subtitle: 'Paid on Nov 01, 2025',
-          ),
-          _PaymentTile(
-            icon: Icons.payment_outlined,
-            title: '₱600 · Personal Loan',
-            subtitle: 'Paid on Oct 28, 2025',
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _accentPink,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
+      body: StreamBuilder<List<Loan>>(
+        stream: _firebaseService.getActiveLoans(),
+        builder: (context, loansSnapshot) {
+          if (!loansSnapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final loans = loansSnapshot.data ?? [];
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            children: [
+              Text(
+                '📄 Active Loans',
+                style: AppTheme.subheading.copyWith(
+                  color: const Color(0xFF727272),
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
-              onPressed: () {},
-              child: const Text(
-                'Make a Payment',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              const SizedBox(height: 8),
+              if (loans.isEmpty)
+                Card(
+                  color: Colors.white,
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(color: Colors.grey.shade300, width: 1.1),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Center(
+                      child: Text(
+                        'No active loans',
+                        style: AppTheme.body.copyWith(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ...loans.map(
+                  (loan) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _LoanCard(
+                      title: loan.purpose,
+                      subtitle:
+                          'Borrowed: ${_formatCurrency(loan.amount)}  •  Remaining: ${_formatCurrency(loan.remainingAmount)}',
+                      progress: loan.progress,
+                      dueLabel: 'Next due: ${_formatDate(loan.nextPaymentDue)}',
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentPink,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () {
+                    Navigator.pushNamed(context, "/make-payment");
+                  },
+                  child: const Text(
+                    'Make a Payment',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -210,50 +240,6 @@ class _LoanCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PaymentTile extends StatelessWidget {
-  const _PaymentTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  static const Color _accentPink = Color(0xFFD81B60);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      elevation: 1,
-      shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300, width: 1),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        leading: CircleAvatar(
-          backgroundColor: _accentPink.withOpacity(0.12),
-          child: Icon(icon, color: _accentPink),
-        ),
-        title: Text(
-          title,
-          style: AppTheme.heading.copyWith(color: Colors.black, fontSize: 14),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: AppTheme.body.copyWith(color: Colors.black54, fontSize: 12.5),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.black26),
-        onTap: () {},
       ),
     );
   }

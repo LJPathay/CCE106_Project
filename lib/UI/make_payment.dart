@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../UI/theme.dart';
+import '../Services/firebase_service.dart';
+import '../Models/Loan.dart';
 
 class MakePaymentPage extends StatefulWidget {
   const MakePaymentPage({super.key});
@@ -21,6 +23,14 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
     "Credit Card",
   ];
   String _selectedMethod = "Bank Transfer";
+  String? _selectedLoanId; // Selected loan ID (null means no loan selected)
+  bool _isSubmitting = false;
+
+  final FirebaseService _firebaseService = FirebaseService();
+
+  String _formatCurrency(double amount) {
+    return '₱${amount.toStringAsFixed(2)}';
+  }
 
   static const Color _accentPink = Color(0xFFD81B60);
 
@@ -44,250 +54,400 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Select Payment Method
-          const Text(
-            'Select Payment Method',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedMethod,
-                isExpanded: true,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Colors.black87,
-                ),
-                items: _paymentMethods.map((m) {
-                  return DropdownMenuItem<String>(
-                    value: m,
-                    child: Text(m, style: const TextStyle(color: Colors.black)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedMethod = value);
-                  }
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+      body: StreamBuilder<List<Loan>>(
+        stream: _firebaseService.getActiveLoans(),
+        builder: (context, loansSnapshot) {
+          final activeLoans = loansSnapshot.data ?? [];
 
-          // Name field
-          const Text(
-            'Name',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              hintText: "Account holder name",
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            style: const TextStyle(color: Colors.black87),
-          ),
-          const SizedBox(height: 16),
-
-          // Account number + CVV row
-          Row(
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Account Number',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _accountController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: "0000 0000 0000",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      style: const TextStyle(color: Colors.black87),
-                    ),
-                  ],
+              // Select Loan (Optional)
+              const Text(
+                'Select Loan (Optional)',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CVV',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.black,
-                      ),
+              const SizedBox(height: 6),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: _selectedLoanId,
+                    isExpanded: true,
+                    hint: const Text(
+                      'Select a loan to pay for (or leave blank)',
+                      style: TextStyle(color: Colors.black54),
                     ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _cvvController,
-                      keyboardType: TextInputType.number,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        hintText: "123",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.black87,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          'No specific loan (General payment)',
+                          style: TextStyle(color: Colors.black),
                         ),
                       ),
-                      style: const TextStyle(color: Colors.black87),
+                      ...activeLoans.map((loan) {
+                        return DropdownMenuItem<String?>(
+                          value: loan.id,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                loan.purpose,
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Remaining: ${_formatCurrency(loan.remainingAmount)}',
+                                style: TextStyle(
+                                  color: Colors.black54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedLoanId = value);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Select Payment Method
+              const Text(
+                'Select Payment Method',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedMethod,
+                    isExpanded: true,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.black87,
                     ),
-                  ],
+                    items: _paymentMethods.map((m) {
+                      return DropdownMenuItem<String>(
+                        value: m,
+                        child: Text(
+                          m,
+                          style: const TextStyle(color: Colors.black),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedMethod = value);
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Name field
+              const Text(
+                'Name',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  hintText: "Account holder name",
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                style: const TextStyle(color: Colors.black87),
+              ),
+              const SizedBox(height: 16),
+
+              // Account number + CVV row
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Account Number',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _accountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: "0000 0000 0000",
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          style: const TextStyle(color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'CVV',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _cvvController,
+                          keyboardType: TextInputType.number,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            hintText: "123",
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          style: const TextStyle(color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Amount
+              const Text(
+                'Enter Amount',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  hintText: "₱ 0.00",
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Details
+              const Text(
+                'Details',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 120,
+                child: TextField(
+                  controller: _detailsController,
+                  maxLines: null,
+                  expands: true,
+                  decoration: InputDecoration(
+                    hintText: "Add payment details (optional)",
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.black87),
+                ),
+              ),
+              const SizedBox(height: 22),
+
+              // Pay button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentPink,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 1,
+                  ),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          FocusScope.of(context).unfocus();
+                          final amount =
+                              double.tryParse(_amountController.text) ?? 0;
+                          if (amount <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a valid amount.'),
+                                backgroundColor: _accentPink,
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (_nameController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please enter account holder name.',
+                                ),
+                                backgroundColor: _accentPink,
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (_accountController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter account number.'),
+                                backgroundColor: _accentPink,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setState(() => _isSubmitting = true);
+                          try {
+                            await _firebaseService.submitPayment(
+                              loanId: _selectedLoanId, // Use selected loan ID
+                              paymentMethod: _selectedMethod,
+                              accountHolderName: _nameController.text.trim(),
+                              accountNumber: _accountController.text.trim(),
+                              amount: amount,
+                              details: _detailsController.text.trim().isEmpty
+                                  ? null
+                                  : _detailsController.text.trim(),
+                            );
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Payment of ₱${amount.toStringAsFixed(2)} via $_selectedMethod submitted.',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: _accentPink,
+                                ),
+                              );
+                              _nameController.clear();
+                              _accountController.clear();
+                              _cvvController.clear();
+                              _amountController.clear();
+                              _detailsController.clear();
+                              setState(
+                                () => _selectedLoanId = null,
+                              ); // Reset loan selection
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: ${e.toString()}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isSubmitting = false);
+                            }
+                          }
+                        },
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : Text(
+                          "Pay",
+                          style: AppTheme.heading.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 16),
-
-          // Amount
-          const Text(
-            'Enter Amount',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              hintText: "₱ 0.00",
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            style: const TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Details
-          const Text(
-            'Details',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 120,
-            child: TextField(
-              controller: _detailsController,
-              maxLines: null,
-              expands: true,
-              decoration: InputDecoration(
-                hintText: "Add payment details (optional)",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              style: const TextStyle(color: Colors.black87),
-            ),
-          ),
-          const SizedBox(height: 22),
-
-          // Pay button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _accentPink,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 1,
-              ),
-              onPressed: () {
-                FocusScope.of(context).unfocus();
-                final amount = double.tryParse(_amountController.text) ?? 0;
-                if (amount <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid amount.'),
-                      backgroundColor: _accentPink,
-                    ),
-                  );
-                  return;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Payment of ₱${amount.toStringAsFixed(2)} via $_selectedMethod submitted.',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    backgroundColor: _accentPink,
-                  ),
-                );
-                _nameController.clear();
-                _accountController.clear();
-                _cvvController.clear();
-                _amountController.clear();
-                _detailsController.clear();
-              },
-              child: Text(
-                "Pay",
-                style: AppTheme.heading.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

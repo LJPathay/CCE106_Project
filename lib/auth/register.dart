@@ -45,6 +45,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'address': _addressController.text.trim(),
+            'isVerified': false, // New users start as unverified
             'createdAt': FieldValue.serverTimestamp(),
           });
       if (mounted) {
