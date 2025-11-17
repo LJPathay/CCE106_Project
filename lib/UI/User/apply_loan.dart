@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../UI/theme.dart';
-import '../Services/firebase_service.dart';
+import '../../layout/theme.dart';
+import '../../Services/firebase_service.dart';
 
 class ApplyLoanPage extends StatefulWidget {
   const ApplyLoanPage({super.key});

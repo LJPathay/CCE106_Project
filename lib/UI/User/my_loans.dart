@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../UI/theme.dart';
-import '../Services/firebase_service.dart';
-import '../Models/Loan.dart';
+import '../../layout/theme.dart';
+import '../../Services/firebase_service.dart';
+import '../../Models/Loan.dart';
 import 'package:intl/intl.dart';
 
 class MyLoansPage extends StatefulWidget {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'theme.dart';
+import '../layout/theme.dart';
 
 class InputField extends StatelessWidget {
   final IconData icon;

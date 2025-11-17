@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../UI/theme.dart';
-import '../Services/firebase_service.dart';
-import '../Models/Loan.dart';
-import '../Models/Payment.dart';
+import '../../layout/theme.dart';
+import '../../Services/firebase_service.dart';
+import '../../Models/Loan.dart';
+import '../../Models/Payment.dart';
 import 'package:intl/intl.dart';
 
 class ViewHistoryPage extends StatefulWidget {
