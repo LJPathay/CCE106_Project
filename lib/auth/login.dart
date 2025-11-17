@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,18 +20,40 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _email.text.trim(),
         password: _password.text,
       );
+      
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      
+      // Get user data to check admin status
+      final userDoc = await FirebaseFirestore.instance
+          .collection("Account")
+          .doc(userCredential.user!.uid)
+          .get();
+          
+      if (userDoc.exists) {
+        final isAdmin = (userDoc.data() as Map<String, dynamic>)['isAdmin'] ?? false;
+        
+        if (!mounted) return;
+        
+        // Redirect based on admin status
+        if (isAdmin == true) {
+          Navigator.pushReplacementNamed(context, '/admin/dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } else {
+        // If user doc doesn't exist, redirect to regular dashboard
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      }
     } on FirebaseAuthException catch (e) {
       final msg = e.message ?? 'Login error';
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

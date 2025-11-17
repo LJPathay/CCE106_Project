@@ -12,6 +12,7 @@ import '../UI/User/view_history.dart';
 import '../UI/User/my_loans.dart';
 import '../UI/User/verification_page.dart';
 import 'Services/firebase_options.dart';
+import 'Middleware/AdminMiddleware.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,13 @@ class MyApp extends StatelessWidget {
           '/view-history': (context) => const ViewHistoryPage(),
           '/my-loans': (context) => const MyLoansPage(),
           '/verification': (context) => const VerificationPage(),
+        },
+        onGenerateRoute: (settings) {
+          // Handle admin routes
+          if (settings.name?.startsWith('/admin') ?? false) {
+            return AdminMiddleware.onGenerateRoute(settings);
+          }
+          return null; // Let other routes be handled normally
         },
       ),
     );
