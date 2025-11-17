@@ -42,6 +42,10 @@ dependencies:
   firebase_ai: ^3.2.0
   intl: ^0.20.2
   image_picker: ^1.1.2
+  http: ^1.2.1
+  path: ^1.9.0
+  mime: ^1.0.4
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

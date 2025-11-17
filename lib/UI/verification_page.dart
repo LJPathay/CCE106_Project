@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../UI/theme.dart';
 import '../Services/firebase_service.dart';
+import '../Services/cloudinary_service.dart';
 
 class VerificationPage extends StatefulWidget {
   const VerificationPage({super.key});
@@ -15,10 +18,12 @@ class _VerificationPageState extends State<VerificationPage> {
   final TextEditingController _additionalInfoController =
       TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
   final ImagePicker _imagePicker = ImagePicker();
 
   String _selectedIdType = 'National ID';
-  File? _selectedImage;
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
   bool _isSubmitting = false;
   bool _isVerified = false;
   bool _isLoading = true;
@@ -65,7 +70,8 @@ class _VerificationPageState extends State<VerificationPage> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = image; // Store XFile directly
+          _selectedImageBytes = null; // Will be read when needed
         });
       }
     } catch (e) {
@@ -89,7 +95,8 @@ class _VerificationPageState extends State<VerificationPage> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = image; // Store XFile directly
+          _selectedImageBytes = null; // Will be read when needed
         });
       }
     } catch (e) {
@@ -116,9 +123,18 @@ class _VerificationPageState extends State<VerificationPage> {
     }
 
     setState(() => _isSubmitting = true);
+    
     try {
+      // Upload image to Cloudinary first
+      final imageUrl = await _cloudinaryService.uploadImage(_selectedImage!);
+      
+      if (imageUrl == null) {
+        throw Exception('Failed to upload image. Please try again.');
+      }
+
+      // Save verification request with Cloudinary URL
       await _firebaseService.submitVerificationRequest(
-        idImage: _selectedImage!,
+        idImageUrl: imageUrl,
         idType: _selectedIdType,
         additionalInfo: _additionalInfoController.text.trim().isEmpty
             ? null
@@ -343,12 +359,25 @@ class _VerificationPageState extends State<VerificationPage> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _selectedImage!,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
+                        child: _selectedImage != null
+                            ? FutureBuilder<Uint8List>(
+                                future: _selectedImage!.readAsBytes(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState ==
+                                          ConnectionState.done &&
+                                      snapshot.hasData) {
+                                    return Image.memory(
+                                      snapshot.data!,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      fit: BoxFit.cover,
+                                    );
+                                  }
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                },
+                              )
+                            : const SizedBox.shrink(),
                       ),
                       Positioned(
                         top: 8,

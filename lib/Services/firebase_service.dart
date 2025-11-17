@@ -50,21 +50,18 @@ class FirebaseService {
     }
   }
 
-  /// Submit verification request with ID image
+  /// Submit verification request with ID image URL from Cloudinary
   Future<void> submitVerificationRequest({
-    required File idImage,
+    required String idImageUrl,
     required String idType,
     String? additionalInfo,
   }) async {
     if (currentUserId == null) throw Exception('User not authenticated');
 
-    // Upload the image first
-    final imageUrl = await uploadIdImage(idImage);
-
-    // Then save the verification request with image URL
+    // Save the verification request with Cloudinary image URL
     await _firestore.collection('verificationRequests').add({
       'userId': currentUserId!,
-      'idImageUrl': imageUrl,
+      'idImageUrl': idImageUrl,
       'idType': idType,
       'additionalInfo': additionalInfo,
       'status': 'pending',
