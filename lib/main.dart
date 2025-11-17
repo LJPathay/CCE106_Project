@@ -5,12 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'bloc/bloc_provider.dart';
 import 'layout/theme.dart';
 import 'auth/login.dart';
-import 'UI/User/dashboard.dart';
-import 'UI/User/apply_loan.dart';
-import 'UI/User/make_payment.dart';
-import 'UI/User/view_history.dart';
-import 'UI/User/my_loans.dart';
-import 'UI/User/verification_page.dart';
+import '../UI/User/Dashboard.dart';
+import '../UI/User/apply_loan.dart';
+import '../UI/User/make_payment.dart';
+import '../UI/User/view_history.dart';
+import '../UI/User/my_loans.dart';
+import '../UI/User/verification_page.dart';
 import 'Services/firebase_options.dart';
 
 void main() async {
