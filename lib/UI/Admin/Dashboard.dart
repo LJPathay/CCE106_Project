@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -10,47 +12,76 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  // Sample data for demonstration
-  final int totalApplicants = 157;
-  final int pendingApprovals = 23;
-  
-  final List<Map<String, dynamic>> recentActivity = [
-    {
-      "name": "Juan Dela Cruz",
-      "reason": "Business Expansion",
-      "amount": 50000.00,
-      "date": "2023-11-17",
-      "status": "Approved",
-    },
-    {
-      "name": "Maria Santos",
-      "reason": "Home Renovation",
-      "amount": 150000.00,
-      "date": "2023-11-16",
-      "status": "Pending",
-    },
-    {
-      "name": "Pedro Bautista",
-      "reason": "Education",
-      "amount": 30000.00,
-      "date": "2023-11-15",
-      "status": "Approved",
-    },
-    {
-      "name": "Ana Reyes",
-      "reason": "Medical Expenses",
-      "amount": 75000.00,
-      "date": "2023-11-14",
-      "status": "Denied",
-    },
-    {
-      "name": "Luis Garcia",
-      "reason": "Vehicle Purchase",
-      "amount": 200000.00,
-      "date": "2023-11-13",
-      "status": "Pending",
-    },
-  ];
+  bool _isLoading = true;
+  String? _error;
+  int totalApplicants = 0;
+  int pendingApprovals = 0;
+  List<Map<String, dynamic>> recentActivity = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      // Get total applicants
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('isAdmin', isNotEqualTo: true)
+          .get();
+      
+      // Get pending loan applications
+      final pendingLoans = await FirebaseFirestore.instance
+          .collection('loan_applications')
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      // Get recent activity (last 5 loan applications)
+      final recentLoans = await FirebaseFirestore.instance
+          .collection('loan_applications')
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .get();
+
+      // Process recent activity
+      final activities = recentLoans.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'name': data['borrowerName'] ?? 'Unknown',
+          'reason': data['purpose'] ?? 'No reason provided',
+          'amount': (data['amount'] ?? 0).toDouble(),
+          'date': (data['createdAt'] as Timestamp).toDate().toString(),
+          'status': (data['status'] as String).isNotEmpty 
+              ? '${data['status'][0].toUpperCase()}${data['status'].substring(1)}'
+              : 'Pending',
+        };
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          totalApplicants = usersSnapshot.size;
+          pendingApprovals = pendingLoans.size;
+          recentActivity = activities;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load dashboard data: $e';
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading dashboard data: $e');
+    }
+  }
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -94,8 +125,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
     final dateFormat = DateFormat('MMM d, yyyy');
 
-    void handleLogout() {
-      Navigator.pushReplacementNamed(context, '/login');
+    void handleLogout() async {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
     }
 
     return Scaffold(
@@ -124,165 +158,191 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome header with date
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back, Admin',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadDashboardData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  dateFormat.format(DateTime.now()),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Stats Cards
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.3,
-              children: [
-                _buildStatCard(
-                  'Total number of Applicants',
-                  totalApplicants.toString(),
-                  Icons.people_alt_outlined,
-                  const Color(0xFF4CAF50), // Green
-                ),
-                _buildStatCard(
-                  'Pending Approval',
-                  pendingApprovals.toString(),
-                  Icons.pending_actions_outlined,
-                  const Color(0xFFFF9800), // Orange
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
-
-            // Recent Activity
-            Text(
-              'Recent Activity',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recentActivity.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = recentActivity[index];
-                final statusColor = getStatusColor(item['status']);
-                return Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Colors.blue[50],
-                              child: Text(
-                                item['name'].toString().substring(0, 1),
-                                style: const TextStyle(color: Colors.blue),
-                              ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Welcome header with date
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome back, Admin',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item['name'],
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  Text(
-                                    item['reason'],
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dateFormat.format(DateTime.now()),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.black54,
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Stats Cards
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.3,
+                        children: [
+                          _buildStatCard(
+                            'Total number of Applicants',
+                            totalApplicants.toString(),
+                            Icons.people_alt_outlined,
+                            const Color(0xFF4CAF50),
+                          ),
+                          _buildStatCard(
+                            'Pending Approval',
+                            pendingApprovals.toString(),
+                            Icons.pending_actions_outlined,
+                            const Color(0xFFFF9800),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // Recent Activity
+                      Text(
+                        'Recent Activity',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (recentActivity.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32.0),
+                          child: Center(child: Text('No recent activity')),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: recentActivity.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final item = recentActivity[index];
+                            final statusColor = getStatusColor(item['status']);
+                            return Card(
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.grey[200]!),
                               ),
-                              child: Text(
-                                item['status'],
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.w500,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: Colors.blue[50],
+                                          child: Text(
+                                            item['name'].toString().substring(0, 1),
+                                            style: const TextStyle(color: Colors.blue),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item['name'],
+                                                style: theme.textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87,
+                                                ),
+                                              ),
+                                              Text(
+                                                item['reason'],
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: Colors.black54,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            item['status'],
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: statusColor,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Amount',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                        Text(
+                                          currencyFormat.format(item['amount']),
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Amount',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.black54,
-                              ),
-                            ),
-                            Text(
-                              currencyFormat.format(item['amount']),
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+                ),
       bottomNavigationBar: BottomAppBar(
         height: 70,
         padding: EdgeInsets.zero,
