@@ -52,13 +52,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     },
   ];
 
-  final List<Map<String, dynamic>> quickActions = [
-    {"icon": Icons.add_circle_outline, "label": "New Loan"},
-    {"icon": Icons.people_outline, "label": "Applicants"},
-    {"icon": Icons.bar_chart, "label": "Reports"},
-    {"icon": Icons.settings, "label": "Settings"},
-  ];
-
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
@@ -73,9 +66,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (_selectedIndex != index) {
+      setState(() {
+        _selectedIndex = index;
+      });
+      // Navigate to appropriate screen
+      switch (index) {
+        case 1:
+          Navigator.pushReplacementNamed(context, '/admin/loans');
+          break;
+        case 2:
+          Navigator.pushReplacementNamed(context, '/admin/verification');
+          break;
+        case 3:
+          Navigator.pushReplacementNamed(context, '/admin/analytics');
+          break;
+        case 4:
+          Navigator.pushReplacementNamed(context, '/admin/users');
+          break;
+      }
+    }
   }
 
   @override
@@ -85,7 +95,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dateFormat = DateFormat('MMM d, yyyy');
 
     void _handleLogout() {
-      // TODO: Implement logout functionality
       Navigator.pushReplacementNamed(context, '/login');
     }
 
@@ -124,35 +133,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome back,',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Admin',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      DateFormat('MMM d, yyyy').format(DateTime.now()),
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Welcome back, Admin',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  dateFormat.format(DateTime.now()),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.black54,
+                  ),
                 ),
               ],
             ),
@@ -190,6 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'Recent Activity',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: Colors.black87,
               ),
             ),
             const SizedBox(height: 16),
@@ -229,14 +223,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Text(
                                     item['name'],
                                     style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
                                   Text(
-                                    '${item['reason']} • ${dateFormat.format(DateTime.parse(item['date']))}',
+                                    item['reason'],
                                     style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey[600],
+                                      color: Colors.black54,
                                     ),
                                   ),
                                 ],
@@ -244,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                                horizontal: 10,
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
@@ -268,13 +262,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Text(
                               'Amount',
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
+                                color: Colors.black54,
                               ),
                             ),
                             Text(
                               currencyFormat.format(item['amount']),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
@@ -297,9 +292,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.credit_card_outlined, 'Loans', 1),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 2),
-            _buildNavItem(Icons.person_outline, 'Users', 3),
+            _buildNavItem(Icons.attach_money, 'Loans', 1),
+            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
+            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
+            _buildNavItem(Icons.person_outline, 'Users', 4),
           ],
         ),
       ),
@@ -370,14 +366,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Icon(
                 icon,
-                color: isSelected ? Colors.blue[800] : Colors.grey[600],
+                color: isSelected ? Colors.blue[800] : Colors.black54,
                 size: 24,
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.grey[600],
+                  color: isSelected ? Colors.blue[800] : Colors.black54,
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
