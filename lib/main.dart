@@ -1,16 +1,17 @@
-import 'package:cce106_finance_project/auth/register.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cce106_finance_project/auth/register.dart';
 import 'bloc/bloc_provider.dart';
 import 'layout/theme.dart';
 import 'auth/login.dart';
-import '../UI/User/Dashboard.dart';
-import '../UI/User/apply_loan.dart';
-import '../UI/User/make_payment.dart';
-import '../UI/User/view_history.dart';
-import '../UI/User/my_loans.dart';
-import '../UI/User/verification_page.dart';
+import 'UI/User/Dashboard.dart';
+import 'UI/User/apply_loan.dart';
+import 'UI/User/make_payment.dart';
+import 'UI/User/view_history.dart';
+import 'UI/User/my_loans.dart';
+import 'UI/User/verification_page.dart';
+import 'package:cce106_finance_project/UI/Admin/Dashboard.dart' show DashboardScreen; 
 import 'Services/firebase_options.dart';
 import 'Middleware/AdminMiddleware.dart';
 
@@ -48,7 +49,25 @@ class MyApp extends StatelessWidget {
             }
             
             if (snapshot.hasData) {
-              return const DashboardPage();
+              // Check if user is admin
+              return FutureBuilder<bool>(
+                future: AdminMiddleware.isAdmin(context),
+                builder: (context, adminSnapshot) {
+                  if (adminSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  
+                  // If user is admin, redirect to admin dashboard
+                  if (adminSnapshot.data == true) {
+                    return const DashboardScreen();
+                  }
+                  
+                  // Otherwise, go to regular user dashboard
+                  return const DashboardPage();
+                },
+              );
             }
             return const LoginPage();
           },

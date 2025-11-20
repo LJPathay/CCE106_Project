@@ -94,7 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
     final dateFormat = DateFormat('MMM d, yyyy');
 
-    void _handleLogout() {
+    void handleLogout() {
       Navigator.pushReplacementNamed(context, '/login');
     }
 
@@ -111,7 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
             onSelected: (value) {
               if (value == 'logout') {
-                _handleLogout();
+                handleLogout();
               }
             },
             itemBuilder: (BuildContext context) => [

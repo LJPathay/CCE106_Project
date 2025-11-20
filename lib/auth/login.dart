@@ -38,16 +38,28 @@ class _LoginPageState extends State<LoginPage> {
         
         if (!mounted) return;
         
-        // Redirect based on admin status
-        if (isAdmin == true) {
-          Navigator.pushReplacementNamed(context, '/admin/dashboard');
+        // Clear navigation stack and redirect based on admin status
+        if (isAdmin) {
+          Navigator.pushNamedAndRemoveUntil(
+            context, 
+            '/admin/dashboard',
+            (route) => false,  // This removes all previous routes
+          );
         } else {
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/dashboard',
+            (route) => false,  // This removes all previous routes
+          );
         }
       } else {
         // If user doc doesn't exist, redirect to regular dashboard
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/dashboard',
+            (route) => false,  // This removes all previous routes
+          );
         }
       }
     } on FirebaseAuthException catch (e) {
