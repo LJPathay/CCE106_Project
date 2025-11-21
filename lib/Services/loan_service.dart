@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoanService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+ // try to add 
   // Get all loan applicants
   Stream<List<Map<String, dynamic>>> getLoanApplicants() {
     return _firestore

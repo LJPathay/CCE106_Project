@@ -42,7 +42,7 @@ class LoanApplication {
       notes: data['notes'] as String?,
     );
   }
-
+  // try to add 
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
