@@ -1,5 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cce106_finance_project/layout/AdminTheme.dart';
+
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return '${this[0].toUpperCase()}${substring(1).toLowerCase()}';
+  }
+}
+
+class VerificationRequest {
+  final String id;
+  final String userId;
+  final String name;
+  final String idType;
+  final String idImageUrl;
+  final String? additionalInfo;
+  String status;
+  final DateTime dateSubmitted;
+
+  VerificationRequest({
+    required this.id,
+    required this.userId,
+    required this.name,
+    required this.idType,
+    required this.idImageUrl,
+    this.additionalInfo,
+    required this.status,
+    required this.dateSubmitted,
+  });
+
+  Color get statusColor {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'approved':
+        return AdminTheme.success;
+      case 'rejected':
+        return AdminTheme.danger;
+      default:
+        return AdminTheme.textSecondary;
+    }
+  }
+}
 
 class VerificationScreen extends StatefulWidget {
   const VerificationScreen({super.key});
@@ -9,13 +54,25 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  int _selectedIndex = 2; // Verify tab
-  String _selectedTab = 'Details';
-  String _verificationStatus = 'Pending';
+  final List<VerificationRequest> _requests = [];
+  final TextEditingController _searchController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = true;
+  String? _error;
+  String _searchQuery = '';
+  String _statusFilter = '';
+  int _selectedIndex = 2; // Verification tab index
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVerificationRequests();
+  }
 
   @override
   void dispose() {
+    _searchController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -25,6 +82,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       setState(() {
         _selectedIndex = index;
       });
+      // Navigate to appropriate screen
       switch (index) {
         case 0:
           Navigator.pushReplacementNamed(context, '/admin/dashboard');
@@ -42,34 +100,488 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
-  void _handleApprove() {
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onItemTapped(index),
+        child: Container(
+          height: 70.0,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? const Color(0xFF1E88E5) : const Color(0xFF9E9E9E),
+                size: 24.0,
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF1E88E5) : const Color(0xFF9E9E9E),
+                  fontSize: 12.0,
+                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadVerificationRequests() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final querySnapshot = await _firestore
+          .collection('verificationRequests')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final requests = await Future.wait(querySnapshot.docs.map((doc) async {
+        final data = doc.data();
+        String name = 'Unknown User';
+        try {
+          // Fetch user details from Account collection
+          final userDoc = await _firestore.collection('Account').doc(data['userId']).get();
+          if (userDoc.exists) {
+            name = userDoc.data()?['fullName'] ?? 'Unknown';
+          }
+        } catch (e) {
+          debugPrint('Error fetching user details: $e');
+        }
+
+        return VerificationRequest(
+          id: doc.id,
+          userId: data['userId'] ?? '',
+          name: name,
+          idType: data['idType'] ?? 'Unknown',
+          idImageUrl: data['idImageUrl'] ?? '',
+          additionalInfo: data['additionalInfo'],
+          status: (data['status'] as String?)?.capitalize() ?? 'Pending',
+          dateSubmitted: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+      }));
+
+      if (mounted) {
+        setState(() {
+          _requests.clear();
+          _requests.addAll(requests);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load verification requests: $e';
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading verification requests: $e');
+    }
+  }
+
+  List<VerificationRequest> get _filteredRequests {
+    if (_searchQuery.isEmpty && _statusFilter.isEmpty) {
+      return _requests;
+    }
+    return _requests.where((req) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          req.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          req.id.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesStatus = _statusFilter.isEmpty || req.status.toLowerCase() == _statusFilter.toLowerCase();
+      return matchesSearch && matchesStatus;
+    }).toList();
+  }
+
+  void _showRequestDetails(VerificationRequest request) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => _buildRequestDetails(request),
+    );
+  }
+
+  Widget _buildRequestCard(VerificationRequest request) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
+      child: InkWell(
+        onTap: () => _showRequestDetails(request),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.blue[50],
+                child: Text(
+                  request.name.isNotEmpty ? request.name[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Colors.blue),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request.idType,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: request.statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  request.status,
+                  style: TextStyle(
+                    color: request.statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String label, String status) {
+    final bool isSelected = _statusFilter.toLowerCase() == status.toLowerCase();
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      showCheckmark: false,
+      onSelected: (selected) {
+        setState(() {
+          _statusFilter = isSelected ? '' : status;
+        });
+      },
+      backgroundColor: Colors.white,
+      selectedColor: const Color(0xFF1E88E5),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black87,
+        fontSize: 13,
+        fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF1E88E5) : Colors.grey[300]!,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRequestDetails(VerificationRequest request) {
+    final dateFormat = DateFormat('MMM d, yyyy hh:mm a');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: request.statusColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Verification Details',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const Divider(),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  _buildDetailItem('Applicant', request.name),
+                  _buildDetailItem('ID Type', request.idType),
+                  _buildDetailItem('Date Submitted', dateFormat.format(request.dateSubmitted)),
+                  if (request.additionalInfo != null && request.additionalInfo!.isNotEmpty)
+                    _buildDetailItem('Additional Info', request.additionalInfo!),
+                  
+                  const SizedBox(height: 24),
+                  const Text(
+                    'ID Document',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (request.idImageUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        request.idImageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 200,
+                            color: Colors.grey[100],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey[100],
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.error_outline, color: Colors.red, size: 32),
+                                  SizedBox(height: 8),
+                                  Text('Failed to load image'),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: const Center(
+                        child: Text('No image provided'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (request.status.toLowerCase() == 'pending') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _handleReject(request),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: BorderSide(color: AdminTheme.danger),
+                    ),
+                    child: Text(
+                      'Reject',
+                      style: TextStyle(color: AdminTheme.danger),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _handleApprove(request),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AdminTheme.success,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text('Approve'),
+                  ),
+                ),
+              ],
+            ),
+          ] else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                color: request.statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  'Request ${request.status}',
+                  style: TextStyle(
+                    color: request.statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                color: Color(0xFF666666),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF333333),
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleApprove(VerificationRequest request) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Approve Loan Application'),
-        content: const Text('Are you sure you want to approve this loan application?'),
+        title: const Text('Approve Verification'),
+        content: const Text('Are you sure you want to approve this verification request? This will mark the user as verified.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _verificationStatus = 'Approved';
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Loan application approved successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+            onPressed: () async {
+              try {
+                await _firestore.runTransaction((transaction) async {
+                  // Update verification request status
+                  transaction.update(
+                    _firestore.collection('verificationRequests').doc(request.id),
+                    {'status': 'approved'},
+                  );
+                  
+                  // Update user verification status
+                  transaction.update(
+                    _firestore.collection('Account').doc(request.userId),
+                    {'isVerified': true},
+                  );
+                });
+                
+                setState(() {
+                  request.status = 'Approved';
+                });
+                
+                if (mounted) {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Close bottom sheet
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Verification approved successfully'),
+                      backgroundColor: AdminTheme.success,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to approve verification: $e'),
+                      backgroundColor: AdminTheme.danger,
+                    ),
+                  );
+                }
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
             child: const Text('Approve'),
           ),
         ],
@@ -77,20 +589,22 @@ class _VerificationScreenState extends State<VerificationScreen> {
     );
   }
 
-  void _handleReject() {
+  void _handleReject(VerificationRequest request) {
+    _notesController.clear();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reject Loan Application'),
+        title: const Text('Reject Verification'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Are you sure you want to reject this loan application?'),
+            const Text('Are you sure you want to reject this request?'),
             const SizedBox(height: 16),
             TextField(
               controller: _notesController,
               decoration: const InputDecoration(
-                labelText: 'Reason for rejection',
+                labelText: 'Reason for rejection (optional)',
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
@@ -103,58 +617,44 @@ class _VerificationScreenState extends State<VerificationScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _verificationStatus = 'Rejected';
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Loan application rejected'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+            onPressed: () async {
+              final reason = _notesController.text.trim();
+              try {
+                await _firestore
+                    .collection('verificationRequests')
+                    .doc(request.id)
+                    .update({
+                      'status': 'rejected',
+                      'rejectionReason': reason,
+                    });
+                
+                setState(() {
+                  request.status = 'Rejected';
+                });
+                
+                if (mounted) {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Close bottom sheet
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Verification rejected'),
+                      backgroundColor: AdminTheme.danger,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to reject verification: $e'),
+                      backgroundColor: AdminTheme.danger,
+                    ),
+                  );
+                }
+              }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.danger),
             child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleRequestMoreInfo() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Request Additional Information'),
-        content: TextField(
-          controller: _notesController,
-          decoration: const InputDecoration(
-            labelText: 'What information do you need?',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 4,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Information request sent to applicant'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-            },
-            child: const Text('Send Request'),
           ),
         ],
       ),
@@ -164,294 +664,152 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
-    final dateFormat = DateFormat('MMM d, yyyy');
 
-    // Get applicant data from arguments or use dummy data
-    final Map<String, dynamic> applicant = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {
-      "id": "LA-001",
-      "name": "Juan Dela Cruz",
-      "email": "juan.delacruz@email.com",
-      "phone": "+63 912 345 6789",
-      "loanType": "Business Loan",
-      "amount": 500000.00,
-      "purpose": "Business Expansion",
-      "status": "Pending",
-      "dateApplied": "2023-11-18",
-      "creditScore": 720,
-      "employmentStatus": "Employed",
-      "monthlyIncome": 45000.00,
-    };
-
-    // Extended dummy data for verification
-    final Map<String, dynamic> verificationData = {
-      "personalInfo": {
-        "fullName": applicant['name'],
-        "dateOfBirth": "1985-05-15",
-        "gender": "Male",
-        "civilStatus": "Married",
-        "nationality": "Filipino",
-        "address": "123 Main Street, Quezon City, Metro Manila",
-        "zipCode": "1100",
-      },
-      "employmentInfo": {
-        "status": applicant['employmentStatus'],
-        "employer": "ABC Corporation",
-        "position": "Senior Manager",
-        "yearsEmployed": "8 years",
-        "monthlyIncome": applicant['monthlyIncome'],
-        "otherIncome": 10000.00,
-      },
-      "loanDetails": {
-        "type": applicant['loanType'],
-        "amount": applicant['amount'],
-        "purpose": applicant['purpose'],
-        "term": "36 months",
-        "interestRate": "12.5%",
-        "monthlyPayment": 16667.00,
-      },
-      "financialInfo": {
-        "bankName": "BDO Unibank",
-        "accountNumber": "****1234",
-        "averageBalance": 125000.00,
-        "existingLoans": 1,
-        "totalDebt": 150000.00,
-        "debtToIncomeRatio": "27.3%",
-      },
-      "documents": [
-        {"name": "Valid ID (Front)", "status": "Verified", "uploadDate": "2023-11-18"},
-        {"name": "Valid ID (Back)", "status": "Verified", "uploadDate": "2023-11-18"},
-        {"name": "Proof of Income", "status": "Verified", "uploadDate": "2023-11-18"},
-        {"name": "Bank Statement", "status": "Pending Review", "uploadDate": "2023-11-18"},
-        {"name": "Business Permit", "status": "Verified", "uploadDate": "2023-11-18"},
-        {"name": "Tax Return", "status": "Pending Review", "uploadDate": "2023-11-18"},
-      ],
-      "creditHistory": {
-        "score": applicant['creditScore'],
-        "rating": "Good",
-        "paymentHistory": "95% on-time payments",
-        "creditUtilization": "35%",
-        "accountAge": "12 years",
-        "recentInquiries": 2,
-      },
-      "verificationChecks": [
-        {"check": "Identity Verification", "status": "Passed", "verifiedBy": "System", "date": "2023-11-18"},
-        {"check": "Employment Verification", "status": "Passed", "verifiedBy": "Maria Santos", "date": "2023-11-18"},
-        {"check": "Income Verification", "status": "Passed", "verifiedBy": "Maria Santos", "date": "2023-11-18"},
-        {"check": "Credit Check", "status": "Passed", "verifiedBy": "System", "date": "2023-11-18"},
-        {"check": "Background Check", "status": "In Progress", "verifiedBy": "Pending", "date": "-"},
-        {"check": "Reference Check", "status": "Pending", "verifiedBy": "Pending", "date": "-"},
-      ],
-      "timeline": [
-        {"event": "Application Submitted", "date": "2023-11-18 09:30", "by": "Juan Dela Cruz"},
-        {"event": "Initial Review Completed", "date": "2023-11-18 10:15", "by": "System"},
-        {"event": "Documents Uploaded", "date": "2023-11-18 11:00", "by": "Juan Dela Cruz"},
-        {"event": "Assigned to Loan Officer", "date": "2023-11-18 14:30", "by": "System"},
-        {"event": "Under Verification", "date": "2023-11-18 15:00", "by": "Maria Santos"},
-      ],
-    };
+    void handleLogout() async {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Loan Verification', style: TextStyle(color: Colors.white)),
+        title: const Text('Verification', style: TextStyle(color: Colors.white)),
         centerTitle: false,
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.print_outlined, color: Colors.white),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Print functionality coming soon')),
-              );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
+            onSelected: (value) {
+              if (value == 'logout') {
+                handleLogout();
+              }
             },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text('Logout'),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.white),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share functionality coming soon')),
-              );
-            },
-          ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          // Applicant Header
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadVerificationRequests,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
                   children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.blue[50],
-                      radius: 30,
-                      child: Text(
-                        applicant['name'].toString().substring(0, 1),
-                        style: const TextStyle(
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                    // Search bar
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search requests...',
+                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
                         ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    
+                    // Status filter chips
+                    Container(
+                      height: 50,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
                         children: [
-                          Text(
-                            applicant['name'],
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            applicant['id'],
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(Icons.calendar_today, size: 12, color: Colors.black54),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Applied: ${dateFormat.format(DateTime.parse(applicant['dateApplied']))}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
+                          _buildStatusChip('All', ''),
+                          const SizedBox(width: 8),
+                          _buildStatusChip('Pending', 'Pending'),
+                          const SizedBox(width: 8),
+                          _buildStatusChip('Approved', 'Approved'),
+                          const SizedBox(width: 8),
+                          _buildStatusChip('Rejected', 'Rejected'),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(_verificationStatus).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _verificationStatus,
-                        style: TextStyle(
-                          color: _getStatusColor(_verificationStatus),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
+                    
+                    // Request list
+                    Expanded(
+                      child: _filteredRequests.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.assignment_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No verification requests found',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _loadVerificationRequests,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _filteredRequests.length,
+                                itemBuilder: (context, index) {
+                                  return _buildRequestCard(_filteredRequests[index]);
+                                },
+                              ),
+                            ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildQuickStat('Amount', currencyFormat.format(applicant['amount'])),
-                      Container(width: 1, height: 30, color: Colors.blue[200]),
-                      _buildQuickStat('Type', applicant['loanType']),
-                      Container(width: 1, height: 30, color: Colors.blue[200]),
-                      _buildQuickStat('Credit', applicant['creditScore'].toString()),
-                    ],
-                  ),
-                ),
-              ],
+      bottomNavigationBar: Container(
+        height: 70.0,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, -1),
             ),
-          ),
-          // Tab Bar
-          Container(
-            color: Colors.white,
-            child: Row(
-              children: [
-                _buildTab('Details'),
-                _buildTab('Documents'),
-                _buildTab('Verification'),
-                _buildTab('Timeline'),
-              ],
-            ),
-          ),
-          // Tab Content
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildTabContent(verificationData, applicant, currencyFormat, dateFormat),
-                  // Action Buttons (only show when pending)
-                  if (_verificationStatus == 'Pending') ...[
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _handleReject,
-                            icon: const Icon(Icons.close),
-                            label: const Text('Reject'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _handleRequestMoreInfo,
-                            icon: const Icon(Icons.info_outline),
-                            label: const Text('More Info'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _handleApprove,
-                            icon: const Icon(Icons.check),
-                            label: const Text('Approve'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
+          ],
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildNavItem(Icons.home_outlined, 'Home', 0),
             _buildNavItem(Icons.attach_money, 'Loans', 1),
@@ -459,508 +817,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
             _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
             _buildNavItem(Icons.person_outline, 'Users', 4),
           ],
-        ),
-      ),
-    );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Widget _buildQuickStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.black54,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTab(String label) {
-    final isSelected = _selectedTab == label;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _selectedTab = label;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? const Color(0xFF1E88E5) : Colors.transparent,
-                width: 2,
-              ),
-            ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? const Color(0xFF1E88E5) : Colors.black54,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabContent(
-    Map<String, dynamic> verificationData,
-    Map<String, dynamic> applicant,
-    NumberFormat currencyFormat,
-    DateFormat dateFormat,
-  ) {
-    switch (_selectedTab) {
-      case 'Details':
-        return _buildDetailsTab(verificationData, currencyFormat);
-      case 'Documents':
-        return _buildDocumentsTab(verificationData['documents'], dateFormat);
-      case 'Verification':
-        return _buildVerificationTab(verificationData, dateFormat);
-      case 'Timeline':
-        return _buildTimelineTab(verificationData['timeline']);
-      default:
-        return const SizedBox();
-    }
-  }
-
-  Widget _buildDetailsTab(Map<String, dynamic> data, NumberFormat currencyFormat) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSection('Personal Information', [
-          _buildInfoRow('Full Name', data['personalInfo']['fullName']),
-          _buildInfoRow('Date of Birth', data['personalInfo']['dateOfBirth']),
-          _buildInfoRow('Gender', data['personalInfo']['gender']),
-          _buildInfoRow('Civil Status', data['personalInfo']['civilStatus']),
-          _buildInfoRow('Nationality', data['personalInfo']['nationality']),
-          _buildInfoRow('Address', data['personalInfo']['address']),
-          _buildInfoRow('Zip Code', data['personalInfo']['zipCode']),
-        ]),
-        const SizedBox(height: 16),
-        _buildSection('Employment Information', [
-          _buildInfoRow('Status', data['employmentInfo']['status']),
-          _buildInfoRow('Employer', data['employmentInfo']['employer']),
-          _buildInfoRow('Position', data['employmentInfo']['position']),
-          _buildInfoRow('Years Employed', data['employmentInfo']['yearsEmployed']),
-          _buildInfoRow('Monthly Income', currencyFormat.format(data['employmentInfo']['monthlyIncome'])),
-          _buildInfoRow('Other Income', currencyFormat.format(data['employmentInfo']['otherIncome'])),
-        ]),
-        const SizedBox(height: 16),
-        _buildSection('Loan Details', [
-          _buildInfoRow('Loan Type', data['loanDetails']['type']),
-          _buildInfoRow('Amount Requested', currencyFormat.format(data['loanDetails']['amount'])),
-          _buildInfoRow('Purpose', data['loanDetails']['purpose']),
-          _buildInfoRow('Loan Term', data['loanDetails']['term']),
-          _buildInfoRow('Interest Rate', data['loanDetails']['interestRate']),
-          _buildInfoRow('Monthly Payment', currencyFormat.format(data['loanDetails']['monthlyPayment'])),
-        ]),
-        const SizedBox(height: 16),
-        _buildSection('Financial Information', [
-          _buildInfoRow('Bank Name', data['financialInfo']['bankName']),
-          _buildInfoRow('Account Number', data['financialInfo']['accountNumber']),
-          _buildInfoRow('Average Balance', currencyFormat.format(data['financialInfo']['averageBalance'])),
-          _buildInfoRow('Existing Loans', data['financialInfo']['existingLoans'].toString()),
-          _buildInfoRow('Total Debt', currencyFormat.format(data['financialInfo']['totalDebt'])),
-          _buildInfoRow('Debt-to-Income Ratio', data['financialInfo']['debtToIncomeRatio']),
-        ]),
-        const SizedBox(height: 16),
-        _buildSection('Credit History', [
-          _buildInfoRow('Credit Score', data['creditHistory']['score'].toString()),
-          _buildInfoRow('Rating', data['creditHistory']['rating']),
-          _buildInfoRow('Payment History', data['creditHistory']['paymentHistory']),
-          _buildInfoRow('Credit Utilization', data['creditHistory']['creditUtilization']),
-          _buildInfoRow('Account Age', data['creditHistory']['accountAge']),
-          _buildInfoRow('Recent Inquiries', data['creditHistory']['recentInquiries'].toString()),
-        ]),
-      ],
-    );
-  }
-
-  Widget _buildDocumentsTab(List<dynamic> documents, DateFormat dateFormat) {
-    return Column(
-      children: documents.map((doc) {
-        final status = doc['status'];
-        final statusColor = status == 'Verified' ? Colors.green : Colors.orange;
-        
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey[200]!),
-          ),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                status == 'Verified' ? Icons.check_circle : Icons.pending,
-                color: statusColor,
-              ),
-            ),
-            title: Text(
-              doc['name'],
-              style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black87),
-            ),
-            subtitle: Text(
-              'Uploaded: ${dateFormat.format(DateTime.parse(doc['uploadDate']))}',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('View ${doc['name']}')),
-              );
-            },
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildVerificationTab(Map<String, dynamic> data, DateFormat dateFormat) {
-    final checks = data['verificationChecks'] as List<dynamic>;
-    
-    return Column(
-      children: checks.map((check) {
-        final status = check['status'];
-        Color statusColor;
-        IconData statusIcon;
-        
-        switch (status) {
-          case 'Passed':
-            statusColor = Colors.green;
-            statusIcon = Icons.check_circle;
-            break;
-          case 'In Progress':
-            statusColor = Colors.blue;
-            statusIcon = Icons.hourglass_empty;
-            break;
-          case 'Pending':
-            statusColor = Colors.orange;
-            statusIcon = Icons.pending;
-            break;
-          default:
-            statusColor = Colors.grey;
-            statusIcon = Icons.help_outline;
-        }
-        
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey[200]!),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(statusIcon, color: statusColor, size: 24),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        check['check'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.person_outline, size: 12, color: Colors.black54),
-                          const SizedBox(width: 4),
-                          Text(
-                            check['verifiedBy'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          if (check['date'] != '-') ...[
-                            const SizedBox(width: 12),
-                            Icon(Icons.calendar_today, size: 12, color: Colors.black54),
-                            const SizedBox(width: 4),
-                            Text(
-                              check['date'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTimelineTab(List<dynamic> timeline) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: timeline.length,
-      itemBuilder: (context, index) {
-        final event = timeline[index];
-        final isLast = index == timeline.length - 1;
-        
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E88E5),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isLast)
-                  Container(
-                    width: 2,
-                    height: 60,
-                    color: Colors.grey[300],
-                  ),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Card(
-                elevation: 0,
-                margin: const EdgeInsets.only(bottom: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[200]!),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event['event'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: 14, color: Colors.black54),
-                          const SizedBox(width: 4),
-                          Text(
-                            event['date'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Icon(Icons.person_outline, size: 14, color: Colors.black54),
-                          const SizedBox(width: 4),
-                          Text(
-                            event['by'],
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildSection(String title, List<Widget> children) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.black54,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blue[800] : Colors.black54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

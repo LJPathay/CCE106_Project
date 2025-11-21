@@ -9,6 +9,7 @@ import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:crypto/crypto.dart';
 
 class CloudinaryService {
   // Cloudinary configuration

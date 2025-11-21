@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,6 +18,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int totalApplicants = 0;
   int pendingApprovals = 0;
   List<Map<String, dynamic>> recentActivity = [];
+  List<BarChartGroupData> monthlyStats = [];
+  double maxApplications = 10;
 
   @override
   void initState() {
@@ -52,7 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Process recent activity
       final activities = recentLoans.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         return {
           'name': data['borrowerName'] ?? 'Unknown',
           'reason': data['purpose'] ?? 'No reason provided',
@@ -64,11 +67,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
         };
       }).toList();
 
+      // Process analytics (Last 6 months)
+      final allLoansSnapshot = await FirebaseFirestore.instance
+          .collection('loan_applications')
+          .get();
+
+      final now = DateTime.now();
+      final Map<int, int> monthlyCounts = {};
+      
+      // Initialize last 6 months with 0
+      for (var i = 5; i >= 0; i--) {
+        final monthDate = DateTime(now.year, now.month - i, 1);
+        final key = monthDate.year * 100 + monthDate.month;
+        monthlyCounts[key] = 0;
+      }
+
+      for (var doc in allLoansSnapshot.docs) {
+        final data = doc.data();
+        if (data['createdAt'] != null) {
+          final date = (data['createdAt'] as Timestamp).toDate();
+          final key = date.year * 100 + date.month;
+          if (monthlyCounts.containsKey(key)) {
+            monthlyCounts[key] = (monthlyCounts[key] ?? 0) + 1;
+          }
+        }
+      }
+
+      final List<BarChartGroupData> stats = [];
+      double maxVal = 0;
+      int index = 0;
+      
+      final sortedKeys = monthlyCounts.keys.toList()..sort();
+      
+      for (var key in sortedKeys) {
+        final count = monthlyCounts[key] ?? 0;
+        if (count > maxVal) maxVal = count.toDouble();
+        
+        stats.add(
+          BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: count.toDouble(),
+                color: const Color(0xFF1E88E5),
+                width: 16,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+              ),
+            ],
+          ),
+        );
+        index++;
+      }
+
       if (mounted) {
         setState(() {
           totalApplicants = usersSnapshot.size;
           pendingApprovals = pendingLoans.size;
           recentActivity = activities;
+          monthlyStats = stats;
+          maxApplications = maxVal > 0 ? maxVal + 2 : 10;
           _isLoading = false;
         });
       }
@@ -90,10 +147,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 'pending':
         return Colors.orange;
       case 'denied':
+      case 'rejected':
         return Colors.red;
       default:
         return Colors.grey;
     }
+  }
+
+  String _getMonthName(int index) {
+    final now = DateTime.now();
+    final month = DateTime(now.year, now.month - (5 - index), 1);
+    return DateFormat('MMM').format(month);
   }
 
   void _onItemTapped(int index) {
@@ -101,7 +165,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() {
         _selectedIndex = index;
       });
-      // Navigate to appropriate screen
       switch (index) {
         case 1:
           Navigator.pushReplacementNamed(context, '/admin/loans');
@@ -183,7 +246,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome header with date
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -206,7 +268,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       const SizedBox(height: 24),
 
-                      // Stats Cards
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -230,9 +291,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
 
+                      const SizedBox(height: 24),
+
+                      _buildAnalyticsGraph(),
+
                       const SizedBox(height: 32),
 
-                      // Recent Activity
                       Text(
                         'Recent Activity',
                         style: theme.textTheme.titleLarge?.copyWith(
@@ -358,6 +422,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildNavItem(Icons.person_outline, 'Users', 4),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsGraph() {
+    return Container(
+      height: 300,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Applications Overview',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxApplications,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (group) => Colors.blueAccent,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        rod.toY.round().toString(),
+                        const TextStyle(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value < 0 || value > 5) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            _getMonthName(value.toInt()),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const SizedBox();
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: monthlyStats,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Model for loan applications in the admin dashboard
-
 class LoanApplication {
   final String id;
   final String userId;
