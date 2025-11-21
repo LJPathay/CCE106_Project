@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cce106_finance_project/services/loan_service.dart';
 
 class LoanApplicantsScreen extends StatefulWidget {
   const LoanApplicantsScreen({super.key});
@@ -12,113 +13,73 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
   int _selectedIndex = 1; // Loans tab
   String _selectedFilter = 'All';
   String _searchQuery = '';
+  final LoanService _loanService = LoanService();
+  late Stream<List<Map<String, dynamic>>> _loanApplicantsStream;
+  Map<String, int> _loanStats = {
+    'total': 0,
+    'pending': 0,
+    'approved': 0,
+    'rejected': 0,
+  };
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> loanApplicants = [
-    {
-      "id": "LA-001",
-      "name": "Juan Dela Cruz",
-      "email": "juan.delacruz@email.com",
-      "phone": "+63 912 345 6789",
-      "loanType": "Business Loan",
-      "amount": 500000.00,
-      "purpose": "Business Expansion",
-      "status": "Pending",
-      "dateApplied": "2023-11-18",
-      "creditScore": 720,
-      "employmentStatus": "Employed",
-      "monthlyIncome": 45000.00,
-    },
-    {
-      "id": "LA-002",
-      "name": "Maria Santos",
-      "email": "maria.santos@email.com",
-      "phone": "+63 917 234 5678",
-      "loanType": "Home Loan",
-      "amount": 1500000.00,
-      "purpose": "Home Renovation",
-      "status": "Under Review",
-      "dateApplied": "2023-11-17",
-      "creditScore": 680,
-      "employmentStatus": "Self-Employed",
-      "monthlyIncome": 60000.00,
-    },
-    {
-      "id": "LA-003",
-      "name": "Pedro Bautista",
-      "email": "pedro.b@email.com",
-      "phone": "+63 918 345 6789",
-      "loanType": "Education Loan",
-      "amount": 300000.00,
-      "purpose": "College Tuition",
-      "status": "Approved",
-      "dateApplied": "2023-11-16",
-      "creditScore": 750,
-      "employmentStatus": "Employed",
-      "monthlyIncome": 55000.00,
-    },
-    {
-      "id": "LA-004",
-      "name": "Ana Reyes",
-      "email": "ana.reyes@email.com",
-      "phone": "+63 919 456 7890",
-      "loanType": "Medical Loan",
-      "amount": 750000.00,
-      "purpose": "Medical Treatment",
-      "status": "Rejected",
-      "dateApplied": "2023-11-15",
-      "creditScore": 580,
-      "employmentStatus": "Unemployed",
-      "monthlyIncome": 0.00,
-    },
-    {
-      "id": "LA-005",
-      "name": "Luis Garcia",
-      "email": "luis.garcia@email.com",
-      "phone": "+63 920 567 8901",
-      "loanType": "Auto Loan",
-      "amount": 2000000.00,
-      "purpose": "Vehicle Purchase",
-      "status": "Pending",
-      "dateApplied": "2023-11-14",
-      "creditScore": 700,
-      "employmentStatus": "Employed",
-      "monthlyIncome": 80000.00,
-    },
-    {
-      "id": "LA-006",
-      "name": "Carmen Lopez",
-      "email": "carmen.lopez@email.com",
-      "phone": "+63 921 678 9012",
-      "loanType": "Personal Loan",
-      "amount": 100000.00,
-      "purpose": "Debt Consolidation",
-      "status": "Under Review",
-      "dateApplied": "2023-11-13",
-      "creditScore": 650,
-      "employmentStatus": "Employed",
-      "monthlyIncome": 40000.00,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
-  List<Map<String, dynamic>> get filteredApplicants {
-    var filtered = loanApplicants;
-    
-    // Filter by status
-    if (_selectedFilter != 'All') {
-      filtered = filtered.where((app) => app['status'] == _selectedFilter).toList();
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Load loan applicants
+      _loanApplicantsStream = _loanService.getLoanApplicants();
+      
+      // Load loan statistics
+      final stats = await _loanService.getLoanStats();
+      
+      if (mounted) {
+        setState(() {
+          _loanStats = stats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load loan data: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
     }
-    
-    // Filter by search query
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((app) {
-        final name = app['name'].toString().toLowerCase();
-        final id = app['id'].toString().toLowerCase();
-        final query = _searchQuery.toLowerCase();
-        return name.contains(query) || id.contains(query);
-      }).toList();
-    }
-    
-    return filtered;
+  }
+
+  Stream<List<Map<String, dynamic>>> get filteredApplicantsStream {
+    return _loanApplicantsStream.map((applicants) {
+      var filtered = List<Map<String, dynamic>>.from(applicants);
+      
+      // Filter by status
+      if (_selectedFilter != 'All') {
+        filtered = filtered.where((app) => app['status'] == _selectedFilter).toList();
+      }
+      
+      // Filter by search query
+      if (_searchQuery.isNotEmpty) {
+        filtered = filtered.where((app) {
+          final name = app['name']?.toString().toLowerCase() ?? '';
+          final id = app['id']?.toString().toLowerCase() ?? '';
+          final query = _searchQuery.toLowerCase();
+          return name.contains(query) || id.contains(query);
+        }).toList();
+      }
+      
+      return filtered;
+    });
   }
 
   Color getStatusColor(String status) {
@@ -163,6 +124,28 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
+  Future<void> _updateStatus(String loanId, String status) async {
+    try {
+      await _loanService.updateLoanStatus(loanId, status);
+      // Refresh stats after update
+      final stats = await _loanService.getLoanStats();
+      if (mounted) {
+        setState(() {
+          _loanStats = stats;
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Status updated to $status')),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
   void _viewApplicantDetails(Map<String, dynamic> applicant) {
     Navigator.pushNamed(
       context,
@@ -176,6 +159,243 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
     final dateFormat = DateFormat('MMM d, yyyy');
+    
+    Widget buildBody() {
+      if (_isLoading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      
+      if (_errorMessage != null) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      return StreamBuilder<List<Map<String, dynamic>>>(
+        stream: filteredApplicantsStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final applicants = snapshot.data ?? [];
+
+          if (applicants.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.search_off, size: 64, color: Colors.black54),
+                  const SizedBox(height: 16),
+                  Text(
+                    _searchQuery.isNotEmpty || _selectedFilter != 'All'
+                        ? 'No matching applicants found'
+                        : 'No loan applications yet',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: applicants.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final applicant = applicants[index];
+              final statusColor = getStatusColor(applicant['status']);
+              
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey[200]!),
+                ),
+                child: InkWell(
+                  onTap: () => _viewApplicantDetails(applicant),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: Colors.blue[50],
+                              radius: 24,
+                              child: Text(
+                                applicant['name'].toString().substring(0, 1),
+                                style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        applicant['name'] ?? 'No Name',
+                                        style: theme.textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          applicant['status'] ?? 'Unknown',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    applicant['id'] ?? 'No ID',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (applicant['status'] == 'Pending') ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _updateStatus(applicant['id'], 'Approved'),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.green),
+                                  ),
+                                  child: const Text('Approve', style: TextStyle(color: Colors.green)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _updateStatus(applicant['id'], 'Rejected'),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.red),
+                                  ),
+                                  child: const Text('Reject', style: TextStyle(color: Colors.red)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildInfoColumn(
+                                'Loan Type',
+                                applicant['loanType'] ?? 'N/A',
+                                Icons.category_outlined,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildInfoColumn(
+                                'Amount',
+                                applicant['amount'] != null 
+                                    ? currencyFormat.format(applicant['amount'])
+                                    : 'N/A',
+                                Icons.attach_money,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildInfoColumn(
+                                'Purpose',
+                                applicant['purpose'] ?? 'N/A',
+                                Icons.description_outlined,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildInfoColumn(
+                                'Applied',
+                                applicant['dateApplied'] != null
+                                    ? dateFormat.format(DateTime.parse(applicant['dateApplied']))
+                                    : 'N/A',
+                                Icons.calendar_today,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _viewApplicantDetails(applicant),
+                              icon: const Icon(Icons.visibility_outlined, size: 18),
+                              label: const Text('View Details'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFF1E88E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -265,50 +485,101 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatItem('Total', loanApplicants.length.toString(), Colors.blue),
+                _buildStatItem('Total', _loanStats['total'].toString(), Colors.blue),
                 _buildStatItem(
                   'Pending',
-                  loanApplicants.where((a) => a['status'] == 'Pending').length.toString(),
+                  _loanStats['pending'].toString(),
                   Colors.orange,
                 ),
                 _buildStatItem(
                   'Approved',
-                  loanApplicants.where((a) => a['status'] == 'Approved').length.toString(),
+                  _loanStats['approved'].toString(),
                   Colors.green,
                 ),
                 _buildStatItem(
                   'Rejected',
-                  loanApplicants.where((a) => a['status'] == 'Rejected').length.toString(),
+                  _loanStats['rejected'].toString(),
                   Colors.red,
                 ),
               ],
             ),
           ),
-          // Applicants List
-          Expanded(
-            child: filteredApplicants.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off, size: 64, color: Colors.black54),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No applicants found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
+          // Loading and Error States
+          if (_isLoading)
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_errorMessage != null)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                : ListView.separated(
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadData,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          // Applicants List
+          else
+            Expanded(
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: filteredApplicantsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  final applicants = snapshot.data ?? [];
+
+                  if (applicants.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.search_off, size: 64, color: Colors.black54),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isNotEmpty || _selectedFilter != 'All'
+                                ? 'No matching applicants found'
+                                : 'No loan applications yet',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filteredApplicants.length,
+                    itemCount: applicants.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final applicant = filteredApplicants[index];
+                      final applicant = applicants[index];
                       final statusColor = getStatusColor(applicant['status']);
                       
                       return Card(
@@ -385,6 +656,31 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
+                                if (applicant['status'] == 'Pending')
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () => _updateStatus(applicant['id'], 'Approved'),
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: Colors.green),
+                                          ),
+                                          child: const Text('Approve', style: TextStyle(color: Colors.green)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () => _updateStatus(applicant['id'], 'Rejected'),
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: Colors.red),
+                                          ),
+                                          child: const Text('Reject', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                const SizedBox(height: 12),
                                 const Divider(height: 1),
                                 const SizedBox(height: 12),
                                 Row(
@@ -392,14 +688,16 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                                     Expanded(
                                       child: _buildInfoColumn(
                                         'Loan Type',
-                                        applicant['loanType'],
+                                        applicant['loanType'] ?? 'N/A',
                                         Icons.category_outlined,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildInfoColumn(
                                         'Amount',
-                                        currencyFormat.format(applicant['amount']),
+                                        applicant['amount'] != null 
+                                            ? currencyFormat.format(applicant['amount'])
+                                            : 'N/A',
                                         Icons.attach_money,
                                       ),
                                     ),
@@ -411,14 +709,16 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                                     Expanded(
                                       child: _buildInfoColumn(
                                         'Purpose',
-                                        applicant['purpose'],
+                                        applicant['purpose'] ?? 'N/A',
                                         Icons.description_outlined,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildInfoColumn(
                                         'Applied',
-                                        dateFormat.format(DateTime.parse(applicant['dateApplied'])),
+                                        applicant['dateApplied'] != null
+                                            ? dateFormat.format(DateTime.parse(applicant['dateApplied']))
+                                            : 'N/A',
                                         Icons.calendar_today,
                                       ),
                                     ),
@@ -444,7 +744,10 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                         ),
                       );
                     },
-                  ),
+                  );
+                }
+              ),
+            
           ),
         ],
       ),
@@ -512,7 +815,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     );
   }
 
-  Widget _buildInfoColumn(String label, String value, IconData icon) {
+  Widget _buildInfoColumn(String label, String? value, IconData icon) {
     return Row(
       children: [
         Icon(icon, size: 16, color: Colors.black54),
@@ -523,14 +826,14 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
             children: [
               Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
                   color: Colors.black54,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                value,
+                value ?? 'N/A',
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
