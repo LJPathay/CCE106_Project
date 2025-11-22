@@ -58,9 +58,19 @@ class FirebaseService {
   }) async {
     if (currentUserId == null) throw Exception('User not authenticated');
 
-    // Save the verification request with Cloudinary image URL
+    // Get user data from Account collection
+    final userDoc = await _firestore.collection('Account').doc(currentUserId).get();
+    final userData = userDoc.data();
+    final String fullName = userData?['fullName'] ?? 
+                          userData?['name'] ?? 
+                          userData?['username'] ?? 
+                          'User ID: $currentUserId';
+
+    // Save the verification request with Cloudinary image URL and user details
     await _firestore.collection('verificationRequests').add({
       'userId': currentUserId!,
+      'fullName': fullName,
+      'email': _auth.currentUser?.email,
       'idImageUrl': idImageUrl,
       'idType': idType,
       'additionalInfo': additionalInfo,

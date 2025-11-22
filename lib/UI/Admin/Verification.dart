@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -59,6 +61,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
   final TextEditingController _notesController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = true;
+  bool _isDisposed = false;
+  bool _isMounted = false;
   String? _error;
   String _searchQuery = '';
   String _statusFilter = '';
@@ -67,21 +71,34 @@ class _VerificationScreenState extends State<VerificationScreen> {
   @override
   void initState() {
     super.initState();
+    _isMounted = true;
     _loadVerificationRequests();
   }
 
   @override
   void dispose() {
+    _isMounted = false;
+    _isDisposed = true;
     _searchController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
+  void _safeSetState(VoidCallback fn) {
+    if (_isMounted && !_isDisposed) {
+      setState(fn);
+    }
+  }
+
   void _onItemTapped(int index) {
     if (_selectedIndex != index) {
-      setState(() {
+      _safeSetState(() {
         _selectedIndex = index;
       });
+      
+      // Only navigate if the widget is still mounted
+      if (!mounted) return;
+      
       // Navigate to appropriate screen
       switch (index) {
         case 0:
@@ -131,57 +148,127 @@ class _VerificationScreenState extends State<VerificationScreen> {
   }
 
   Future<void> _loadVerificationRequests() async {
+    if (!_isMounted || _isDisposed) return;
+    
+    _safeSetState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-
       final querySnapshot = await _firestore
           .collection('verificationRequests')
           .orderBy('createdAt', descending: true)
           .get();
 
-      final requests = await Future.wait(querySnapshot.docs.map((doc) async {
-        final data = doc.data();
-        String name = 'Unknown User';
-        try {
-          // Fetch user details from Account collection
-          final userDoc = await _firestore.collection('Account').doc(data['userId']).get();
-          if (userDoc.exists) {
-            name = userDoc.data()?['fullName'] ?? 'Unknown';
+      if (!_isMounted || _isDisposed) return;
+
+      final requests = await Future.wait<VerificationRequest>(
+        querySnapshot.docs.map((doc) async {
+          if (!_isMounted || _isDisposed) {
+            return VerificationRequest(
+              id: '',
+              userId: '',
+              name: 'Loading...',
+              idType: '',
+              idImageUrl: '',
+              status: 'Pending',
+              dateSubmitted: DateTime.now(),
+            );
           }
-        } catch (e) {
-          debugPrint('Error fetching user details: $e');
-        }
+          
+          try {
+            final data = doc.data();
+            String name = 'Loading...';
+            String? userId;
+            
+            try {
+              userId = data['userId']?.toString();
+              if (userId != null && userId.isNotEmpty) {
+                // First, try to get the name from the verification request data
+                name = data['fullName'] ?? data['name'] ?? 'User ID: $userId';
+                
+                // If not found in verification request, try the Account collection
+                if (name == 'User ID: $userId') {
+                  final userDoc = await _firestore.collection('Account').doc(userId).get();
+                  if (userDoc.exists) {
+                    final userData = userDoc.data();
+                    name = userData?['fullName'] ?? 
+                           userData?['name'] ?? 
+                           userData?['displayName'] ?? 
+                           name; // Keep the existing name if not found
+                  } else {
+                    debugPrint('User document not found in Account collection for ID: $userId');
+                    
+                    // If we have an email but no name, use the email prefix as name
+                    if (data['email'] != null) {
+                      final email = data['email'].toString();
+                      name = email.split('@').first;
+                      
+                      // Try to create the account document with available data
+                      try {
+                        await _firestore.collection('Account').doc(userId).set({
+                          'email': email,
+                          'fullName': name,
+                          'createdAt': FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+                        
+                        debugPrint('Created account document for user: $userId');
+                      } catch (e) {
+                        debugPrint('Error creating account document: $e');
+                      }
+                    }
+                  }
+                }
+              } else {
+                debugPrint('Invalid or missing userId in verification request: ${doc.id}');
+                name = 'Unknown User';
+              }
+            } catch (e) {
+              debugPrint('Error fetching user details: $e');
+              name = 'User ID: ${userId ?? 'Unknown'}';
+            }
 
-        return VerificationRequest(
-          id: doc.id,
-          userId: data['userId'] ?? '',
-          name: name,
-          idType: data['idType'] ?? 'Unknown',
-          idImageUrl: data['idImageUrl'] ?? '',
-          additionalInfo: data['additionalInfo'],
-          status: (data['status'] as String?)?.capitalize() ?? 'Pending',
-          dateSubmitted: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        );
-      }));
+            return VerificationRequest(
+              id: doc.id,
+              userId: data['userId']?.toString() ?? '',
+              name: name,
+              idType: data['idType']?.toString() ?? 'Unknown',
+              idImageUrl: data['idImageUrl']?.toString() ?? '',
+              additionalInfo: data['additionalInfo']?.toString(),
+              status: (data['status'] as String?)?.capitalize() ?? 'Pending',
+              dateSubmitted: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            );
+          } catch (e) {
+            debugPrint('Error processing verification request: $e');
+            return VerificationRequest(
+              id: '',
+              userId: '',
+              name: 'Error',
+              idType: '',
+              idImageUrl: '',
+              status: 'Pending',
+              dateSubmitted: DateTime.now(),
+            );
+          }
+        }),
+      );
 
-      if (mounted) {
-        setState(() {
-          _requests.clear();
-          _requests.addAll(requests);
-          _isLoading = false;
-        });
-      }
+      if (!_isMounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _requests.clear();
+        _requests.addAll(requests.where((r) => r.id.isNotEmpty));
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Failed to load verification requests: $e';
-          _isLoading = false;
-        });
-      }
       debugPrint('Error loading verification requests: $e');
+      if (!_isMounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _error = 'Failed to load verification requests: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
