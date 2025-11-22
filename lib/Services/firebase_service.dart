@@ -92,42 +92,39 @@ class FirebaseService {
   }) async {
     if (currentUserId == null) throw Exception('User not authenticated');
 
-    // Check if user is verified
-    final verified = await isUserVerified();
-    if (!verified) {
-      throw Exception(
-        'You must be verified to apply for a loan. Please complete verification first.',
-      );
-    }
+    // Get user data first
+    final userDoc = await _firestore.collection('users').doc(currentUserId).get();
+    final userData = userDoc.data();
 
-    // Calculate next payment due date (30 days from now for monthly loans, adjust based on term)
-    DateTime? nextPaymentDue;
-    final termLower = term.toLowerCase();
-    if (termLower.contains('month')) {
-      final months = int.tryParse(term.split(' ')[0]) ?? 1;
-      nextPaymentDue = DateTime.now().add(Duration(days: 30 * months));
-    } else if (termLower.contains('day')) {
-      final days = int.tryParse(term.split(' ')[0]) ?? 7;
-      nextPaymentDue = DateTime.now().add(Duration(days: days));
-    }
+    // Ensure consistent date format using server timestamp
+    final now = FieldValue.serverTimestamp();
+    
+    // Create loan data with explicit types and ensure status is 'Pending'
+    final Map<String, dynamic> loanData = {
+      'userId': currentUserId,
+      'name': userData?['fullName'] ?? userData?['name'] ?? 'Unknown User',
+      'email': userData?['email'] ?? _auth.currentUser?.email ?? 'No email',
+      'amount': amount,
+      'interestRate': interestRate,
+      'totalAmount': totalAmount,
+      'monthlyPayment': monthlyPayment,
+      'term': term,
+      'purpose': purpose,
+      'status': 'Pending', // Explicitly set status to 'Pending'
+      'dateApplied': now,
+      'createdAt': now,
+      'updatedAt': now,
+    };
 
-    final loan = Loan(
-      id: '', // Will be set by Firestore
-      userId: currentUserId!,
-      amount: amount,
-      interestRate: interestRate,
-      totalAmount: totalAmount,
-      monthlyPayment: monthlyPayment,
-      term: term,
-      purpose: purpose,
-      status: 'approved', // Auto-approve for demo purposes
-      createdAt: DateTime.now(),
-      approvedAt: DateTime.now(),
-      remainingAmount: totalAmount,
-      nextPaymentDue: nextPaymentDue,
-    );
-
-    final docRef = await _firestore.collection('loans').add(loan.toMap());
+    // Save to the main loans collection (admin panel)
+    final docRef = await _firestore.collection('loans').add(loanData);
+    
+    // Also save to user's personal loans collection with the same data
+    await _firestore.collection('users').doc(currentUserId).collection('loans').add({
+      ...loanData,
+      'applicationId': docRef.id,  // Add application ID for reference
+    });
+    
     return docRef.id;
   }
 

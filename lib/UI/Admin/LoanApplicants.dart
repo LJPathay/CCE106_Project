@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cce106_finance_project/services/loan_service.dart';
 
 class LoanApplicantsScreen extends StatefulWidget {
@@ -15,7 +16,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
   String _searchQuery = '';
   final LoanService _loanService = LoanService();
   late Stream<List<Map<String, dynamic>>> _loanApplicantsStream;
-  Map<String, int> _loanStats = {
+  final Map<String, int> _loanStats = {
     'total': 0,
     'pending': 0,
     'approved': 0,
@@ -23,11 +24,18 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
   };
   bool _isLoading = true;
   String? _errorMessage;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -37,22 +45,21 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     });
 
     try {
-      // Load loan applicants
       _loanApplicantsStream = _loanService.getLoanApplicants();
-      
-      // Load loan statistics
       final stats = await _loanService.getLoanStats();
       
       if (mounted) {
         setState(() {
-          _loanStats = stats;
+          _loanStats
+            ..clear()
+            ..addAll(stats);
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to load loan data: ${e.toString()}';
+          _errorMessage = 'Failed to load loan data: $e';
           _isLoading = false;
         });
       }
@@ -82,7 +89,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     });
   }
 
-  Color getStatusColor(String status) {
+  Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
         return Colors.green;
@@ -102,7 +109,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
       setState(() {
         _selectedIndex = index;
       });
-      // Navigate to appropriate screen
+      
       switch (index) {
         case 0:
           Navigator.pushReplacementNamed(context, '/admin/dashboard');
@@ -120,652 +127,127 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
     }
   }
 
-  void _handleLogout() {
-    Navigator.pushReplacementNamed(context, '/login');
-  }
-
   Future<void> _updateStatus(String loanId, String status) async {
     try {
+      setState(() => _isLoading = true);
       await _loanService.updateLoanStatus(loanId, status);
+      
       // Refresh stats after update
       final stats = await _loanService.getLoanStats();
+      
       if (mounted) {
         setState(() {
-          _loanStats = stats;
+          _loanStats
+            ..clear()
+            ..addAll(stats);
+          _isLoading = false;
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Status updated to $status')),
-      );
-    } catch (e) {
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update status: ${e.toString()}')),
+          SnackBar(content: Text('Status updated to $status')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: $e')),
         );
       }
     }
   }
 
-  void _viewApplicantDetails(Map<String, dynamic> applicant) {
-    Navigator.pushNamed(
-      context,
-      '/admin/verification',
-      arguments: applicant,
+  void _showLoanDetailsPopup(BuildContext context, Map<String, dynamic> applicant) {
+    final status = (applicant['status']?.toString() ?? 'Pending').toLowerCase();
+    final canApprove = status == 'pending' || status == 'under review';
+    final canReject = status == 'pending' || status == 'under review' || status == 'approved';
+    final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Loan Application Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailRow('Applicant', applicant['name'] ?? 'N/A'),
+              _buildDetailRow('Amount', currencyFormat.format(double.tryParse(applicant['amount']?.toString() ?? '0') ?? 0)),
+              _buildDetailRow('Term', '${applicant['term']} months'),
+              _buildDetailRow('Purpose', applicant['purpose'] ?? 'Not specified'),
+              _buildDetailRow('Status', applicant['status'] ?? 'Pending'),
+              _buildDetailRow('Date Applied', _formatDate(applicant['dateApplied'])),
+              if (applicant['dateApproved'] != null)
+                _buildDetailRow('Date Approved', _formatDate(applicant['dateApproved'])),
+              if (applicant['dateRejected'] != null)
+                _buildDetailRow('Date Rejected', _formatDate(applicant['dateRejected'])),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE', style: TextStyle(color: Colors.grey)),
+          ),
+          if (canReject)
+            TextButton(
+              onPressed: () {
+                _updateStatus(applicant['id'], 'Rejected');
+                Navigator.pop(context);
+              },
+              child: const Text('REJECT', style: TextStyle(color: Colors.red)),
+            ),
+          if (canApprove)
+            ElevatedButton(
+              onPressed: () {
+                _updateStatus(applicant['id'], 'Approved');
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('APPROVE', style: TextStyle(color: Colors.white)),
+            ),
+        ],
+      ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
-    final dateFormat = DateFormat('MMM d, yyyy');
-    
-    Widget buildBody() {
-      if (_isLoading) {
-        return const Center(child: CircularProgressIndicator());
+  String _formatDate(dynamic date) {
+    if (date == null) return 'N/A';
+    try {
+      if (date is String) {
+        if (date.isEmpty) return 'N/A';
+        return DateFormat('MMM d, yyyy hh:mm a').format(DateTime.parse(date));
+      } else if (date is DateTime) {
+        return DateFormat('MMM d, yyyy hh:mm a').format(date);
+      } else if (date is Timestamp) {
+        return DateFormat('MMM d, yyyy hh:mm a').format(date.toDate());
       }
-      
-      if (_errorMessage != null) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        );
-      }
-      
-      return StreamBuilder<List<Map<String, dynamic>>>(
-        stream: filteredApplicantsStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final applicants = snapshot.data ?? [];
-
-          if (applicants.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.search_off, size: 64, color: Colors.black54),
-                  const SizedBox(height: 16),
-                  Text(
-                    _searchQuery.isNotEmpty || _selectedFilter != 'All'
-                        ? 'No matching applicants found'
-                        : 'No loan applications yet',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: applicants.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final applicant = applicants[index];
-              final statusColor = getStatusColor(applicant['status']);
-              
-              return Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[200]!),
-                ),
-                child: InkWell(
-                  onTap: () => _viewApplicantDetails(applicant),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Colors.blue[50],
-                              radius: 24,
-                              child: Text(
-                                applicant['name'].toString().substring(0, 1),
-                                style: const TextStyle(
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        applicant['name'] ?? 'No Name',
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          applicant['status'] ?? 'Unknown',
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    applicant['id'] ?? 'No ID',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (applicant['status'] == 'Pending') ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _updateStatus(applicant['id'], 'Approved'),
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: Colors.green),
-                                  ),
-                                  child: const Text('Approve', style: TextStyle(color: Colors.green)),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _updateStatus(applicant['id'], 'Rejected'),
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: Colors.red),
-                                  ),
-                                  child: const Text('Reject', style: TextStyle(color: Colors.red)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildInfoColumn(
-                                'Loan Type',
-                                applicant['loanType'] ?? 'N/A',
-                                Icons.category_outlined,
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildInfoColumn(
-                                'Amount',
-                                applicant['amount'] != null 
-                                    ? currencyFormat.format(applicant['amount'])
-                                    : 'N/A',
-                                Icons.attach_money,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildInfoColumn(
-                                'Purpose',
-                                applicant['purpose'] ?? 'N/A',
-                                Icons.description_outlined,
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildInfoColumn(
-                                'Applied',
-                                applicant['dateApplied'] != null
-                                    ? dateFormat.format(DateTime.parse(applicant['dateApplied']))
-                                    : 'N/A',
-                                Icons.calendar_today,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => _viewApplicantDetails(applicant),
-                              icon: const Icon(Icons.visibility_outlined, size: 18),
-                              label: const Text('View Details'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF1E88E5),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      );
+      return date.toString();
+    } catch (e) {
+      return 'Invalid date';
     }
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Loan Applicants', style: TextStyle(color: Colors.white)),
-        centerTitle: false,
-        elevation: 0,
-        backgroundColor: const Color(0xFF1E88E5),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
-            onSelected: (value) {
-              if (value == 'logout') {
-                _handleLogout();
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'logout',
-                child: Text('Logout'),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search and Filter Section
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Search Bar
-                TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or ID...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF1E88E5)),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Pending'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Under Review'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Approved'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Rejected'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          Text(
+            '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
           ),
-          // Stats Summary
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.blue[50],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Total', _loanStats['total'].toString(), Colors.blue),
-                _buildStatItem(
-                  'Pending',
-                  _loanStats['pending'].toString(),
-                  Colors.orange,
-                ),
-                _buildStatItem(
-                  'Approved',
-                  _loanStats['approved'].toString(),
-                  Colors.green,
-                ),
-                _buildStatItem(
-                  'Rejected',
-                  _loanStats['rejected'].toString(),
-                  Colors.red,
-                ),
-              ],
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87),
             ),
-          ),
-          // Loading and Error States
-          if (_isLoading)
-            const Expanded(
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_errorMessage != null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red, fontSize: 16),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _loadData,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          // Applicants List
-          else
-            Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: filteredApplicantsStream,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text('Error: ${snapshot.error}'),
-                    );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-
-                  final applicants = snapshot.data ?? [];
-
-                  if (applicants.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.search_off, size: 64, color: Colors.black54),
-                          const SizedBox(height: 16),
-                          Text(
-                            _searchQuery.isNotEmpty || _selectedFilter != 'All'
-                                ? 'No matching applicants found'
-                                : 'No loan applications yet',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: applicants.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final applicant = applicants[index];
-                      final statusColor = getStatusColor(applicant['status']);
-                      
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey[200]!),
-                        ),
-                        child: InkWell(
-                          onTap: () => _viewApplicantDetails(applicant),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor: Colors.blue[50],
-                                      radius: 24,
-                                      child: Text(
-                                        applicant['name'].toString().substring(0, 1),
-                                        style: const TextStyle(
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                applicant['name'],
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor.withOpacity(0.1),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  applicant['status'],
-                                                  style: theme.textTheme.labelSmall?.copyWith(
-                                                    color: statusColor,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            applicant['id'],
-                                            style: theme.textTheme.bodySmall?.copyWith(
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                if (applicant['status'] == 'Pending')
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => _updateStatus(applicant['id'], 'Approved'),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.green),
-                                          ),
-                                          child: const Text('Approve', style: TextStyle(color: Colors.green)),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => _updateStatus(applicant['id'], 'Rejected'),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Colors.red),
-                                          ),
-                                          child: const Text('Reject', style: TextStyle(color: Colors.red)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildInfoColumn(
-                                        'Loan Type',
-                                        applicant['loanType'] ?? 'N/A',
-                                        Icons.category_outlined,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _buildInfoColumn(
-                                        'Amount',
-                                        applicant['amount'] != null 
-                                            ? currencyFormat.format(applicant['amount'])
-                                            : 'N/A',
-                                        Icons.attach_money,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildInfoColumn(
-                                        'Purpose',
-                                        applicant['purpose'] ?? 'N/A',
-                                        Icons.description_outlined,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _buildInfoColumn(
-                                        'Applied',
-                                        applicant['dateApplied'] != null
-                                            ? dateFormat.format(DateTime.parse(applicant['dateApplied']))
-                                            : 'N/A',
-                                        Icons.calendar_today,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    TextButton.icon(
-                                      onPressed: () => _viewApplicantDetails(applicant),
-                                      icon: const Icon(Icons.visibility_outlined, size: 18),
-                                      label: const Text('View Details'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF1E88E5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }
-              ),
-            
           ),
         ],
-      ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.attach_money, 'Loans', 1),
-            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
-            _buildNavItem(Icons.person_outline, 'Users', 4),
-          ],
-        ),
       ),
     );
   }
@@ -777,17 +259,14 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          _selectedFilter = label;
+          _selectedFilter = selected ? label : 'All';
         });
       },
-      backgroundColor: Colors.white,
-      selectedColor: const Color(0xFF1E88E5),
+      backgroundColor: Colors.grey[200],
+      selectedColor: Colors.blue[100],
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
-        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-      ),
-      side: BorderSide(
-        color: isSelected ? const Color(0xFF1E88E5) : Colors.grey[300]!,
+        color: isSelected ? Colors.blue[800] : Colors.black87,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
   }
@@ -797,10 +276,10 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: 20,
+          style: const TextStyle(
+            fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: color,
+            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 4),
@@ -808,73 +287,292 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.black54,
+            color: Colors.grey[600],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildInfoColumn(String label, String? value, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.black54),
-        const SizedBox(width: 6),
-        Expanded(
+  Widget _buildLoanCard(Map<String, dynamic> applicant, BuildContext context) {
+    final status = (applicant['status']?.toString() ?? 'Pending').toLowerCase();
+    final statusColor = _getStatusColor(status);
+    final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: () => _showLoanDetailsPopup(context, applicant),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.black54,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    applicant['name'] ?? 'No Name',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      (applicant['status'] ?? 'Pending').toString().toUpperCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                value ?? 'N/A',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black87,
-                ),
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildInfoColumn(
+                    'Amount',
+                    currencyFormat.format(double.tryParse(applicant['amount']?.toString() ?? '0') ?? 0),
+                    Icons.attach_money,
+                  ),
+                  const SizedBox(width: 16),
+                  _buildInfoColumn(
+                    'Term',
+                    '${applicant['term']} months',
+                    Icons.calendar_today,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildInfoColumn(
+                    'Applied',
+                    _formatDate(applicant['dateApplied']),
+                    Icons.access_time,
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildInfoColumn(String label, String value, IconData icon) {
     return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blue[800] : Colors.black54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
+              Icon(icon, size: 16, color: Colors.black54),
+              const SizedBox(width: 4),
               Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text(
+          'Loan Applicants',
+          style: TextStyle(color: Colors.white),
+        ),
+        centerTitle: false,
+        elevation: 0,
+        backgroundColor: const Color(0xFF1E88E5),
+        iconTheme: const IconThemeData(color: Colors.white),
+        automaticallyImplyLeading: false, // This line removes the back button
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.account_circle,
+              color: Colors.white,
+              size: 28,
+            ),
+            onSelected: (value) {
+              if (value == 'logout') {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(value: 'logout', child: Text('Logout')),
+            ],
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(child: Text(_errorMessage!))
+              : Column(
+                  children: [
+                    // Search and Filter Section
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search applicants...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildFilterChip('All'),
+                                const SizedBox(width: 8),
+                                _buildFilterChip('Pending'),
+                                const SizedBox(width: 8),
+                                _buildFilterChip('Approved'),
+                                const SizedBox(width: 8),
+                                _buildFilterChip('Rejected'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Stats Summary
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      color: Colors.white,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem('Total', _loanStats['total'].toString(), colorScheme.primary),
+                          _buildStatItem('Pending', _loanStats['pending'].toString(), Colors.orange),
+                          _buildStatItem('Approved', _loanStats['approved'].toString(), Colors.green),
+                          _buildStatItem('Rejected', _loanStats['rejected'].toString(), Colors.red),
+                        ],
+                      ),
+                    ),
+                    // Loan List
+                    Expanded(
+                      child: StreamBuilder<List<Map<String, dynamic>>>(
+                        stream: filteredApplicantsStream,
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          }
+
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+
+                          final applicants = snapshot.data ?? [];
+
+                          if (applicants.isEmpty) {
+                            return const Center(
+                              child: Text(
+                                'No loan applications found',
+                                style: TextStyle(color: Colors.black54),
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: applicants.length,
+                            itemBuilder: (context, index) {
+                              final applicant = applicants[index];
+                              return _buildLoanCard(applicant, context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+      bottomNavigationBar: Container(
+        height: 70, // Set the height to 70
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          onTap: _onItemTapped,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.attach_money),
+              label: 'Loans',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined),
+              label: 'Verification',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_outlined),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              label: 'Users',
+            ),
+          ],
         ),
       ),
     );

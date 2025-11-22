@@ -762,24 +762,30 @@ class _VerificationScreenState extends State<VerificationScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Verification', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Verification',
+          style: TextStyle(color: Colors.white),
+        ),
         centerTitle: false,
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
         iconTheme: const IconThemeData(color: Colors.white),
+        automaticallyImplyLeading: false, // Add this line
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle, color: Colors.white, size: 28),
+            icon: const Icon(
+              Icons.account_circle,
+              color: Colors.white,
+              size: 28,
+            ),
             onSelected: (value) {
               if (value == 'logout') {
-                handleLogout();
+                // Handle logout
+                Navigator.pushReplacementNamed(context, '/login');
               }
             },
             itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'logout',
-                child: Text('Logout'),
-              ),
+              const PopupMenuItem(value: 'logout', child: Text('Logout')),
             ],
           ),
           const SizedBox(width: 8),
