@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -12,115 +14,96 @@ class _UsersScreenState extends State<UsersScreen> {
   int _selectedIndex = 4; // Users tab
   String _selectedFilter = 'All';
   String _searchQuery = '';
+  bool _isLoading = true;
+  String? _error;
+  
+  List<Map<String, dynamic>> users = [];
+  List<Map<String, dynamic>> filteredUsers = [];
 
-  final List<Map<String, dynamic>> users = [
-    {
-      "id": "USR-001",
-      "name": "Juan Dela Cruz",
-      "email": "juan.delacruz@email.com",
-      "phone": "+63 912 345 6789",
-      "role": "Borrower",
-      "status": "Active",
-      "joinDate": "2023-01-15",
-      "totalLoans": 3,
-      "activeLoans": 1,
-      "creditScore": 720,
-      "lastLogin": "2023-11-18 14:30",
-    },
-    {
-      "id": "USR-002",
-      "name": "Maria Santos",
-      "email": "maria.santos@email.com",
-      "phone": "+63 917 234 5678",
-      "role": "Borrower",
-      "status": "Active",
-      "joinDate": "2023-02-20",
-      "totalLoans": 2,
-      "activeLoans": 1,
-      "creditScore": 680,
-      "lastLogin": "2023-11-17 09:15",
-    },
-    {
-      "id": "USR-003",
-      "name": "Pedro Bautista",
-      "email": "pedro.b@email.com",
-      "phone": "+63 918 345 6789",
-      "role": "Admin",
-      "status": "Active",
-      "joinDate": "2022-11-10",
-      "totalLoans": 0,
-      "activeLoans": 0,
-      "creditScore": 0,
-      "lastLogin": "2023-11-18 16:45",
-    },
-    {
-      "id": "USR-004",
-      "name": "Ana Reyes",
-      "email": "ana.reyes@email.com",
-      "phone": "+63 919 456 7890",
-      "role": "Borrower",
-      "status": "Suspended",
-      "joinDate": "2023-03-05",
-      "totalLoans": 4,
-      "activeLoans": 0,
-      "creditScore": 580,
-      "lastLogin": "2023-11-10 11:20",
-    },
-    {
-      "id": "USR-005",
-      "name": "Luis Garcia",
-      "email": "luis.garcia@email.com",
-      "phone": "+63 920 567 8901",
-      "role": "Borrower",
-      "status": "Active",
-      "joinDate": "2023-04-12",
-      "totalLoans": 1,
-      "activeLoans": 1,
-      "creditScore": 700,
-      "lastLogin": "2023-11-18 10:00",
-    },
-    {
-      "id": "USR-006",
-      "name": "Carmen Lopez",
-      "email": "carmen.lopez@email.com",
-      "phone": "+63 921 678 9012",
-      "role": "Loan Officer",
-      "status": "Active",
-      "joinDate": "2022-08-20",
-      "totalLoans": 0,
-      "activeLoans": 0,
-      "creditScore": 0,
-      "lastLogin": "2023-11-18 15:30",
-    },
-    {
-      "id": "USR-007",
-      "name": "Roberto Tan",
-      "email": "roberto.tan@email.com",
-      "phone": "+63 922 789 0123",
-      "role": "Borrower",
-      "status": "Inactive",
-      "joinDate": "2023-05-18",
-      "totalLoans": 1,
-      "activeLoans": 0,
-      "creditScore": 650,
-      "lastLogin": "2023-10-15 08:45",
-    },
-    {
-      "id": "USR-008",
-      "name": "Sofia Mendoza",
-      "email": "sofia.mendoza@email.com",
-      "phone": "+63 923 890 1234",
-      "role": "Loan Officer",
-      "status": "Active",
-      "joinDate": "2023-01-08",
-      "totalLoans": 0,
-      "activeLoans": 0,
-      "creditScore": 0,
-      "lastLogin": "2023-11-18 13:20",
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
 
-  List<Map<String, dynamic>> get filteredUsers {
+  Future<void> _loadUsers() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('Account')
+          .get();
+
+      final List<Map<String, dynamic>> loadedUsers = [];
+      
+      for (var doc in usersSnapshot.docs) {
+        final data = doc.data();
+        final userId = doc.id;
+        
+        // Get user's loans to calculate statistics
+        final loansSnapshot = await FirebaseFirestore.instance
+            .collection('loans')
+            .where('userId', isEqualTo: userId)
+            .get();
+        
+        int totalLoans = loansSnapshot.docs.length;
+        int activeLoans = loansSnapshot.docs.where((loanDoc) {
+          final status = (loanDoc.data()['status'] ?? '').toString().toLowerCase();
+          return status == 'approved' || status == 'active';
+        }).length;
+        
+        // Calculate credit score (simplified - based on loan history)
+        int creditScore = 650; // Base score
+        if (totalLoans > 0) {
+          creditScore += (activeLoans * 10); // Bonus for active loans
+          creditScore = creditScore.clamp(300, 850);
+        }
+        
+        // Helper function to safely convert date fields
+        String getDateString(dynamic dateField) {
+          if (dateField == null) return DateTime.now().toString();
+          if (dateField is Timestamp) return dateField.toDate().toString();
+          if (dateField is String) return dateField;
+          return DateTime.now().toString();
+        }
+        
+        loadedUsers.add({
+          "id": userId,
+          "name": data['fullName'] ?? data['name'] ?? 'Unknown User',
+          "email": data['email'] ?? 'No email',
+          "phone": data['phone'] ?? data['phoneNumber'] ?? 'No phone',
+          "role": (data['isAdmin'] == true) ? 'Admin' : 'Borrower',
+          "status": data['status'] ?? 'Active',
+          "joinDate": getDateString(data['createdAt']),
+          "totalLoans": totalLoans,
+          "activeLoans": activeLoans,
+          "creditScore": creditScore,
+          "lastLogin": getDateString(data['lastLogin']),
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          users = loadedUsers;
+          _applyFilters();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load users: $e';
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading users: $e');
+    }
+  }
+
+  void _applyFilters() {
     var filtered = users;
     
     // Filter by status/role
@@ -143,7 +126,9 @@ class _UsersScreenState extends State<UsersScreen> {
       }).toList();
     }
     
-    return filtered;
+    setState(() {
+      filteredUsers = filtered;
+    });
   }
 
   Color getStatusColor(String status) {
@@ -163,8 +148,6 @@ class _UsersScreenState extends State<UsersScreen> {
     switch (role.toLowerCase()) {
       case 'admin':
         return Colors.purple;
-      case 'loan officer':
-        return Colors.blue;
       case 'borrower':
         return Colors.orange;
       default:
@@ -345,17 +328,34 @@ class _UsersScreenState extends State<UsersScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              user['status'] == 'Active'
-                                  ? 'User suspended'
-                                  : 'User activated',
+                      onPressed: () async {
+                        final newStatus = user['status'] == 'Active' ? 'Suspended' : 'Active';
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection('Account')
+                              .doc(user['id'])
+                              .update({'status': newStatus});
+                          
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                user['status'] == 'Active'
+                                    ? 'User suspended successfully'
+                                    : 'User activated successfully',
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                          _loadUsers(); // Reload users
+                        } catch (e) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to update user status: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                       icon: Icon(
                         user['status'] == 'Active'
@@ -447,7 +447,27 @@ class _UsersScreenState extends State<UsersScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadUsers,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
         children: [
           // Search and Filter Section
           Container(
@@ -461,6 +481,7 @@ class _UsersScreenState extends State<UsersScreen> {
                     setState(() {
                       _searchQuery = value;
                     });
+                    _applyFilters();
                   },
                   decoration: InputDecoration(
                     hintText: 'Search by name, email or ID...',
@@ -497,8 +518,6 @@ class _UsersScreenState extends State<UsersScreen> {
                       const SizedBox(width: 8),
                       _buildFilterChip('Admin'),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Loan Officer'),
-                      const SizedBox(width: 8),
                       _buildFilterChip('Borrower'),
                     ],
                   ),
@@ -525,8 +544,8 @@ class _UsersScreenState extends State<UsersScreen> {
                   Colors.orange,
                 ),
                 _buildStatItem(
-                  'Staff',
-                  users.where((u) => u['role'] != 'Borrower').length.toString(),
+                  'Admins',
+                  users.where((u) => u['role'] == 'Admin').length.toString(),
                   Colors.purple,
                 ),
               ],
@@ -762,6 +781,7 @@ class _UsersScreenState extends State<UsersScreen> {
         setState(() {
           _selectedFilter = label;
         });
+        _applyFilters();
       },
       backgroundColor: Colors.white,
       selectedColor: const Color(0xFF1E88E5),

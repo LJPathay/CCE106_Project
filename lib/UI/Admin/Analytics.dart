@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -11,58 +13,216 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   int _selectedIndex = 3; // Reports tab
   String _selectedPeriod = 'This Month';
+  bool _isLoading = true;
+  String? _error;
 
-  // Dummy analytics data
-  final Map<String, dynamic> analyticsData = {
-    "totalLoans": 157,
-    "approvedLoans": 89,
-    "pendingLoans": 45,
-    "rejectedLoans": 23,
-    "totalAmount": 45750000.00,
-    "approvedAmount": 28500000.00,
-    "pendingAmount": 12250000.00,
-    "averageLoanAmount": 291401.27,
-    "averageProcessingTime": "5.2 days",
-    "approvalRate": 56.7,
+  // Real-time analytics data
+  Map<String, dynamic> analyticsData = {
+    "totalLoans": 0,
+    "approvedLoans": 0,
+    "pendingLoans": 0,
+    "rejectedLoans": 0,
+    "totalAmount": 0.0,
+    "approvedAmount": 0.0,
+    "pendingAmount": 0.0,
+    "averageLoanAmount": 0.0,
+    "averageProcessingTime": "0 days",
+    "approvalRate": 0.0,
   };
 
-  final List<Map<String, dynamic>> monthlyTrends = [
-    {"month": "Jan", "applications": 45, "approvals": 28, "amount": 3500000},
-    {"month": "Feb", "applications": 52, "approvals": 31, "amount": 4200000},
-    {"month": "Mar", "applications": 48, "approvals": 29, "amount": 3800000},
-    {"month": "Apr", "applications": 61, "approvals": 38, "amount": 5100000},
-    {"month": "May", "applications": 55, "approvals": 33, "amount": 4500000},
-    {"month": "Jun", "applications": 58, "approvals": 35, "amount": 4800000},
-  ];
+  List<Map<String, dynamic>> monthlyTrends = [];
+  List<Map<String, dynamic>> loanTypeDistribution = [];
+  List<Map<String, dynamic>> topPerformers = [];
 
-  final List<Map<String, dynamic>> loanTypeDistribution = [
-    {"type": "Business Loan", "count": 45, "percentage": 28.7, "color": Colors.blue},
-    {"type": "Home Loan", "count": 38, "percentage": 24.2, "color": Colors.green},
-    {"type": "Auto Loan", "count": 32, "percentage": 20.4, "color": Colors.orange},
-    {"type": "Education Loan", "count": 25, "percentage": 15.9, "color": Colors.purple},
-    {"type": "Personal Loan", "count": 17, "percentage": 10.8, "color": Colors.red},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAnalyticsData();
+  }
 
-  final List<Map<String, dynamic>> topPerformers = [
-    {
-      "name": "Juan Dela Cruz",
-      "loansProcessed": 45,
-      "approvalRate": 82.2,
-      "avgProcessingTime": "4.5 days",
-    },
-    {
-      "name": "Maria Santos",
-      "loansProcessed": 38,
-      "approvalRate": 78.9,
-      "avgProcessingTime": "5.1 days",
-    },
-    {
-      "name": "Pedro Bautista",
-      "loansProcessed": 32,
-      "approvalRate": 75.0,
-      "avgProcessingTime": "5.8 days",
-    },
-  ];
+  DateTime _getStartDate() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 'Today':
+        return DateTime(now.year, now.month, now.day);
+      case 'This Week':
+        return now.subtract(Duration(days: now.weekday - 1));
+      case 'This Month':
+        return DateTime(now.year, now.month, 1);
+      case 'This Year':
+        return DateTime(now.year, 1, 1);
+      default:
+        return DateTime(now.year, now.month, 1);
+    }
+  }
+
+  Future<void> _loadAnalyticsData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final startDate = _getStartDate();
+      final startTimestamp = Timestamp.fromDate(startDate);
+
+      // Fetch all loans within the selected period
+      final loansQuery = await FirebaseFirestore.instance
+          .collection('loans')
+          .where('createdAt', isGreaterThanOrEqualTo: startTimestamp)
+          .get();
+
+      // Calculate metrics
+      int totalLoans = loansQuery.docs.length;
+      int approvedLoans = 0;
+      int pendingLoans = 0;
+      int rejectedLoans = 0;
+      double totalAmount = 0.0;
+      double approvedAmount = 0.0;
+      double pendingAmount = 0.0;
+      Map<String, int> loanTypes = {};
+      int totalProcessingDays = 0;
+      int processedLoans = 0;
+
+      for (var doc in loansQuery.docs) {
+        final data = doc.data();
+        final status = (data['status'] ?? 'pending').toString().toLowerCase();
+        final amount = (data['amount'] ?? 0).toDouble();
+        final purpose = data['purpose'] ?? 'Other';
+
+        totalAmount += amount;
+
+        if (status == 'approved' || status == 'active') {
+          approvedLoans++;
+          approvedAmount += amount;
+          
+          // Calculate processing time
+          if (data['createdAt'] != null && data['updatedAt'] != null) {
+            final created = (data['createdAt'] as Timestamp).toDate();
+            final updated = (data['updatedAt'] as Timestamp).toDate();
+            totalProcessingDays += updated.difference(created).inDays;
+            processedLoans++;
+          }
+        } else if (status == 'pending') {
+          pendingLoans++;
+          pendingAmount += amount;
+        } else if (status == 'rejected' || status == 'denied') {
+          rejectedLoans++;
+        }
+
+        // Count loan types
+        loanTypes[purpose] = (loanTypes[purpose] ?? 0) + 1;
+      }
+
+      // Calculate loan type distribution
+      final List<Map<String, dynamic>> distribution = [];
+      final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal];
+      int colorIndex = 0;
+      
+      loanTypes.forEach((type, count) {
+        final percentage = totalLoans > 0 ? (count / totalLoans * 100) : 0.0;
+        distribution.add({
+          "type": type,
+          "count": count,
+          "percentage": percentage,
+          "color": colors[colorIndex % colors.length],
+        });
+        colorIndex++;
+      });
+      distribution.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+
+      // Calculate monthly trends (last 6 months)
+      final now = DateTime.now();
+      final List<Map<String, dynamic>> trends = [];
+      
+      for (var i = 5; i >= 0; i--) {
+        final monthDate = DateTime(now.year, now.month - i, 1);
+        final monthStart = Timestamp.fromDate(monthDate);
+        final monthEnd = Timestamp.fromDate(DateTime(monthDate.year, monthDate.month + 1, 0, 23, 59, 59));
+        
+        final monthLoans = await FirebaseFirestore.instance
+            .collection('loans')
+            .where('createdAt', isGreaterThanOrEqualTo: monthStart)
+            .where('createdAt', isLessThanOrEqualTo: monthEnd)
+            .get();
+        
+        int applications = monthLoans.docs.length;
+        int approvals = monthLoans.docs.where((doc) {
+          final status = (doc.data()['status'] ?? '').toString().toLowerCase();
+          return status == 'approved' || status == 'active';
+        }).length;
+        
+        double amount = monthLoans.docs.fold(0.0, (sum, doc) => sum + ((doc.data()['amount'] ?? 0) as num).toDouble());
+        
+        trends.add({
+          "month": DateFormat('MMM').format(monthDate),
+          "applications": applications,
+          "approvals": approvals,
+          "amount": amount,
+        });
+      }
+
+      // Get top borrowers (users with most loans)
+      final usersQuery = await FirebaseFirestore.instance
+          .collection('Account')
+          .where('isAdmin', isNotEqualTo: true)
+          .get();
+
+      final List<Map<String, dynamic>> performers = [];
+      for (var userDoc in usersQuery.docs) {
+        final userId = userDoc.id;
+        final userName = userDoc.data()['fullName'] ?? userDoc.data()['name'] ?? 'Unknown User';
+        
+        final userLoans = loansQuery.docs.where((doc) => doc.data()['userId'] == userId).toList();
+        if (userLoans.isNotEmpty) {
+          final loansProcessed = userLoans.length;
+          final approvedCount = userLoans.where((doc) {
+            final status = (doc.data()['status'] ?? '').toString().toLowerCase();
+            return status == 'approved' || status == 'active';
+          }).length;
+          
+          final approvalRate = (approvedCount / loansProcessed * 100);
+          
+          performers.add({
+            "name": userName,
+            "loansProcessed": loansProcessed,
+            "approvalRate": approvalRate,
+            "avgProcessingTime": "N/A",
+          });
+        }
+      }
+      performers.sort((a, b) => (b['loansProcessed'] as int).compareTo(a['loansProcessed'] as int));
+
+      if (mounted) {
+        setState(() {
+          analyticsData = {
+            "totalLoans": totalLoans,
+            "approvedLoans": approvedLoans,
+            "pendingLoans": pendingLoans,
+            "rejectedLoans": rejectedLoans,
+            "totalAmount": totalAmount,
+            "approvedAmount": approvedAmount,
+            "pendingAmount": pendingAmount,
+            "averageLoanAmount": totalLoans > 0 ? totalAmount / totalLoans : 0.0,
+            "averageProcessingTime": processedLoans > 0 ? "${(totalProcessingDays / processedLoans).toStringAsFixed(1)} days" : "0 days",
+            "approvalRate": totalLoans > 0 ? (approvedLoans / totalLoans * 100) : 0.0,
+          };
+          monthlyTrends = trends;
+          loanTypeDistribution = distribution;
+          topPerformers = performers.take(3).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load analytics: $e';
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading analytics: $e');
+    }
+  }
 
   void _onItemTapped(int index) {
     if (_selectedIndex != index) {
@@ -124,7 +284,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadAnalyticsData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -622,6 +802,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         setState(() {
           _selectedPeriod = label;
         });
+        _loadAnalyticsData(); // Reload data when period changes
       },
       backgroundColor: Colors.white,
       selectedColor: const Color(0xFF1E88E5),

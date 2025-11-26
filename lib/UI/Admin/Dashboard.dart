@@ -34,33 +34,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _error = null;
       });
 
-      // Get total applicants
+      // Get total applicants from Account collection
       final usersSnapshot = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('Account')
           .where('isAdmin', isNotEqualTo: true)
           .get();
       
-      // Get pending loan applications
+      // Get pending loan applications from loans collection
       final pendingLoans = await FirebaseFirestore.instance
-          .collection('loan_applications')
+          .collection('loans')
           .where('status', isEqualTo: 'pending')
           .get();
 
       // Get recent activity (last 5 loan applications)
       final recentLoans = await FirebaseFirestore.instance
-          .collection('loan_applications')
+          .collection('loans')
           .orderBy('createdAt', descending: true)
           .limit(5)
           .get();
 
-      // Process recent activity
+      // Process recent activity with safe date handling
       final activities = recentLoans.docs.map((doc) {
         final data = doc.data();
+        
+        // Safe date conversion helper
+        String getDateString(dynamic dateField) {
+          if (dateField == null) return DateTime.now().toString();
+          if (dateField is Timestamp) return dateField.toDate().toString();
+          if (dateField is String) return dateField;
+          return DateTime.now().toString();
+        }
+        
         return {
-          'name': data['borrowerName'] ?? 'Unknown',
+          'name': data['name'] ?? data['borrowerName'] ?? 'Unknown',
           'reason': data['purpose'] ?? 'No reason provided',
           'amount': (data['amount'] ?? 0).toDouble(),
-          'date': (data['createdAt'] as Timestamp).toDate().toString(),
+          'date': getDateString(data['createdAt']),
           'status': (data['status'] as String).isNotEmpty 
               ? '${data['status'][0].toUpperCase()}${data['status'].substring(1)}'
               : 'Pending',
@@ -69,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Process analytics (Last 6 months)
       final allLoansSnapshot = await FirebaseFirestore.instance
-          .collection('loan_applications')
+          .collection('loans')
           .get();
 
       final now = DateTime.now();
@@ -85,7 +94,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (var doc in allLoansSnapshot.docs) {
         final data = doc.data();
         if (data['createdAt'] != null) {
-          final date = (data['createdAt'] as Timestamp).toDate();
+          DateTime date;
+          if (data['createdAt'] is Timestamp) {
+            date = (data['createdAt'] as Timestamp).toDate();
+          } else if (data['createdAt'] is String) {
+            date = DateTime.parse(data['createdAt']);
+          } else {
+            continue;
+          }
           final key = date.year * 100 + date.month;
           if (monthlyCounts.containsKey(key)) {
             monthlyCounts[key] = (monthlyCounts[key] ?? 0) + 1;
@@ -203,7 +219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         elevation: 0,
         backgroundColor: const Color(0xFF1E88E5),
         iconTheme: const IconThemeData(color: Colors.white),
-        automaticallyImplyLeading: false, // Add this line
+        automaticallyImplyLeading: false,
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(
