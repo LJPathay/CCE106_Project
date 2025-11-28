@@ -234,22 +234,22 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 1,
-        title: ShaderMask(
-          shaderCallback: (bounds) =>
-              AppTheme.instagramGradient.createShader(bounds),
-          child: const Text(
-            'Apply for a Loan',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-            ),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Apply for Loan',
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
           // Loan Amount input
           const Text(
@@ -257,30 +257,52 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: Colors.black, // high-contrast label!
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _amountController,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              prefixIcon: const Icon(
-                Icons.account_balance_wallet_outlined,
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
-              hintText: 'Enter loan amount (max ₱50,000)',
-              hintStyle: TextStyle(color: Colors.grey[700]),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: _accentPink,
+                ),
+                hintText: 'Enter amount (e.g. 5000)',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
               ),
+              onChanged: (_) => _calculate(),
             ),
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
-            onChanged: (_) => _calculate(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           // Repayment term dropdown
           const Text(
@@ -288,31 +310,38 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: Colors.black, // high-contrast
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedTerm,
                 isExpanded: true,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Colors.black87,
-                ),
+                icon: const Icon(Icons.keyboard_arrow_down, color: _accentPink),
                 items: _loanTerms.keys.map((term) {
                   return DropdownMenuItem<String>(
                     value: term,
                     child: Text(
                       term,
-                      style: const TextStyle(fontSize: 16, color: Colors.black),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
                     ),
                   );
                 }).toList(),
@@ -325,7 +354,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
           // Reason dropdown
           const Text(
@@ -333,31 +362,38 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
-              color: Colors.black,
+              color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedPurpose,
                 isExpanded: true,
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Colors.black87,
-                ),
+                icon: const Icon(Icons.keyboard_arrow_down, color: _accentPink),
                 items: _loanPurposes.map((purpose) {
                   return DropdownMenuItem<String>(
                     value: purpose,
                     child: Text(
                       purpose,
-                      style: const TextStyle(fontSize: 16, color: Colors.black),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
                     ),
                   );
                 }).toList(),
@@ -369,307 +405,257 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
 
-          // Monthly Payments box (matches wireframe large area)
-          const Text(
-            'Monthly Payments',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Center(
-              child: Text(
-                _showSummary
-                    ? (_currentMonths < 1
-                          ? 'Amount due: ${_formatPeso(_monthly)}'
-                          : 'Monthly: ${_formatPeso(_monthly)}')
-                    : 'Enter amount and select terms',
-                style: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Terms & Conditions
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _acceptedTerms,
-            activeColor: _accentPink,
-            onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
-            title: const Text(
-              'Terms and Conditions',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            controlAffinity: ListTileControlAffinity.leading,
-          ),
-
+          // Summary Card
           if (_showSummary)
             FadeTransition(
               opacity: _fade,
-              child: Card(
-                elevation: 3,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Loan Summary',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Loan Amount:',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _formatPeso(
-                              double.tryParse(_amountController.text) ?? 0.0,
-                            ),
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Term:',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            termData['label'],
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Interest Rate:',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            '${termData['interestRate']}%',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Purpose:',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Flexible(
-                            child: Text(
-                              _selectedPurpose,
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _currentMonths < 1
-                                ? 'Amount due:'
-                                : 'Monthly Payment:',
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _formatPeso(_monthly),
-                            style: const TextStyle(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total Payment:',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _formatPeso(_total),
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2E3192).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Monthly Payment',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        Text(
+                          _formatPeso(_monthly),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: Colors.white24),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Interest',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        Text(
+                          _formatPeso(
+                            _total -
+                                (double.tryParse(_amountController.text) ?? 0),
+                          ),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total Repayment',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        Text(
+                          _formatPeso(_total),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Center(
+                child: Text(
+                  'Enter amount and select terms\nto see calculation',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 ),
               ),
             ),
+
           const SizedBox(height: 24),
 
-          ElevatedButton(
-            onPressed: (!_acceptedTerms || _isSubmitting || !_showSummary)
-                ? null
-                : () async {
-                    _calculate();
-                    if (!_showSummary) return;
-
-                    setState(() => _isSubmitting = true);
-                    try {
-                      final amount =
-                          double.tryParse(_amountController.text) ?? 0.0;
-                      if (amount <= 0) {
-                        throw Exception('Please enter a valid amount');
-                      }
-
-                      final termData = _loanTerms[_selectedTerm]!;
-                      final interestRate = termData['interestRate'] as double;
-
-                      await _firebaseService.submitLoanApplication(
-                        amount: amount,
-                        interestRate: interestRate,
-                        totalAmount: _total,
-                        monthlyPayment: _monthly,
-                        term: _selectedTerm,
-                        purpose: _selectedPurpose,
-                      );
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Loan application submitted!\nAmount: ${_formatPeso(amount)}\nPurpose: $_selectedPurpose',
-                            ),
-                            backgroundColor: _accentPink,
-                          ),
-                        );
-                        // Clear form after successful submission
-                        _amountController.clear();
-                        setState(() {
-                          _showSummary = false;
-                          _acceptedTerms = false;
-                          _monthly = 0.0;
-                          _total = 0.0;
-                          _currentMonths = 3.0;
-                        });
-                        _anim.reset();
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: ${e.toString()}'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => _isSubmitting = false);
-                      }
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accentPink,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
+          // Terms & Conditions
+          Theme(
+            data: ThemeData(unselectedWidgetColor: Colors.grey[400]),
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _acceptedTerms,
+              activeColor: _accentPink,
+              onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+              title: Text(
+                'I agree to the Terms and Conditions and Privacy Policy',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 2,
+              controlAffinity: ListTileControlAffinity.leading,
             ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
+          ),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: (!_acceptedTerms || _isSubmitting || !_showSummary)
+                  ? null
+                  : () async {
+                      _calculate();
+                      if (!_showSummary) return;
+
+                      setState(() => _isSubmitting = true);
+                      try {
+                        final amount =
+                            double.tryParse(_amountController.text) ?? 0.0;
+                        if (amount <= 0) {
+                          throw Exception('Please enter a valid amount');
+                        }
+
+                        final termData = _loanTerms[_selectedTerm]!;
+                        final interestRate = termData['interestRate'] as double;
+
+                        await _firebaseService.submitLoanApplication(
+                          amount: amount,
+                          interestRate: interestRate,
+                          totalAmount: _total,
+                          monthlyPayment: _monthly,
+                          term: _selectedTerm,
+                          purpose: _selectedPurpose,
+                        );
+
+                        if (mounted) {
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 60,
+                                  ),
+                                  SizedBox(height: 10),
+                                  Text(
+                                    'Application Submitted!',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                              content: const Text(
+                                'Your loan application has been submitted successfully. We will review it shortly.',
+                                textAlign: TextAlign.center,
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context); // Close dialog
+                                    Navigator.pop(
+                                      context,
+                                    ); // Go back to dashboard
+                                  },
+                                  child: const Text(
+                                    'OK',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          // Clear form after successful submission
+                          _amountController.clear();
+                          setState(() {
+                            _showSummary = false;
+                            _acceptedTerms = false;
+                            _monthly = 0.0;
+                            _total = 0.0;
+                            _currentMonths = 3.0;
+                          });
+                          _anim.reset();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isSubmitting = false);
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accentPink,
+                disabledBackgroundColor: Colors.grey[300],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+                shadowColor: _accentPink.withOpacity(0.4),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : const Text(
+                      'Apply Now',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                  )
-                : const Text(
-                    'Apply for Loan',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+            ),
           ),
         ],
       ),

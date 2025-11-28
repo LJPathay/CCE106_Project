@@ -11,15 +11,15 @@ import 'UI/User/make_payment.dart';
 import 'UI/User/view_history.dart';
 import 'UI/User/my_loans.dart';
 import 'UI/User/verification_page.dart';
-import 'package:cce106_finance_project/UI/Admin/Dashboard.dart' show DashboardScreen; 
+import 'UI/User/profile_page.dart';
+import 'package:cce106_finance_project/UI/Admin/Dashboard.dart'
+    show DashboardScreen;
 import 'Services/firebase_options.dart';
 import 'Middleware/AdminMiddleware.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // ✅ FIX for Web
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -42,28 +42,27 @@ class MyApp extends StatelessWidget {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
+                body: Center(child: CircularProgressIndicator()),
               );
             }
-            
+
             if (snapshot.hasData) {
               // Check if user is admin
               return FutureBuilder<bool>(
                 future: AdminMiddleware.isAdmin(context),
                 builder: (context, adminSnapshot) {
-                  if (adminSnapshot.connectionState == ConnectionState.waiting) {
+                  if (adminSnapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return const Scaffold(
                       body: Center(child: CircularProgressIndicator()),
                     );
                   }
-                  
+
                   // If user is admin, redirect to admin dashboard
                   if (adminSnapshot.data == true) {
                     return const DashboardScreen();
                   }
-                  
+
                   // Otherwise, go to regular user dashboard
                   return const DashboardPage();
                 },
@@ -81,6 +80,7 @@ class MyApp extends StatelessWidget {
           '/view-history': (context) => const ViewHistoryPage(),
           '/my-loans': (context) => const MyLoansPage(),
           '/verification': (context) => const VerificationPage(),
+          '/profile': (context) => const ProfilePage(),
         },
         onGenerateRoute: (settings) {
           // Handle admin routes

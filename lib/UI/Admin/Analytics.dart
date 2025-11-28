@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -95,7 +94,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         if (status == 'approved' || status == 'active') {
           approvedLoans++;
           approvedAmount += amount;
-          
+
           // Calculate processing time
           if (data['createdAt'] != null && data['updatedAt'] != null) {
             final created = (data['createdAt'] as Timestamp).toDate();
@@ -116,9 +115,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
       // Calculate loan type distribution
       final List<Map<String, dynamic>> distribution = [];
-      final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red, Colors.teal];
+      final colors = [
+        Colors.blue,
+        Colors.green,
+        Colors.orange,
+        Colors.purple,
+        Colors.red,
+        Colors.teal,
+      ];
       int colorIndex = 0;
-      
+
       loanTypes.forEach((type, count) {
         final percentage = totalLoans > 0 ? (count / totalLoans * 100) : 0.0;
         distribution.add({
@@ -129,31 +135,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         });
         colorIndex++;
       });
-      distribution.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+      distribution.sort(
+        (a, b) => (b['count'] as int).compareTo(a['count'] as int),
+      );
 
       // Calculate monthly trends (last 6 months)
       final now = DateTime.now();
       final List<Map<String, dynamic>> trends = [];
-      
+
       for (var i = 5; i >= 0; i--) {
         final monthDate = DateTime(now.year, now.month - i, 1);
         final monthStart = Timestamp.fromDate(monthDate);
-        final monthEnd = Timestamp.fromDate(DateTime(monthDate.year, monthDate.month + 1, 0, 23, 59, 59));
-        
+        final monthEnd = Timestamp.fromDate(
+          DateTime(monthDate.year, monthDate.month + 1, 0, 23, 59, 59),
+        );
+
         final monthLoans = await FirebaseFirestore.instance
             .collection('loans')
             .where('createdAt', isGreaterThanOrEqualTo: monthStart)
             .where('createdAt', isLessThanOrEqualTo: monthEnd)
             .get();
-        
+
         int applications = monthLoans.docs.length;
         int approvals = monthLoans.docs.where((doc) {
           final status = (doc.data()['status'] ?? '').toString().toLowerCase();
           return status == 'approved' || status == 'active';
         }).length;
-        
-        double amount = monthLoans.docs.fold(0.0, (sum, doc) => sum + ((doc.data()['amount'] ?? 0) as num).toDouble());
-        
+
+        double amount = monthLoans.docs.fold(
+          0.0,
+          (sum, doc) => sum + ((doc.data()['amount'] ?? 0) as num).toDouble(),
+        );
+
         trends.add({
           "month": DateFormat('MMM').format(monthDate),
           "applications": applications,
@@ -171,18 +184,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final List<Map<String, dynamic>> performers = [];
       for (var userDoc in usersQuery.docs) {
         final userId = userDoc.id;
-        final userName = userDoc.data()['fullName'] ?? userDoc.data()['name'] ?? 'Unknown User';
-        
-        final userLoans = loansQuery.docs.where((doc) => doc.data()['userId'] == userId).toList();
+        final userName =
+            userDoc.data()['fullName'] ??
+            userDoc.data()['name'] ??
+            'Unknown User';
+
+        final userLoans = loansQuery.docs
+            .where((doc) => doc.data()['userId'] == userId)
+            .toList();
         if (userLoans.isNotEmpty) {
           final loansProcessed = userLoans.length;
           final approvedCount = userLoans.where((doc) {
-            final status = (doc.data()['status'] ?? '').toString().toLowerCase();
+            final status = (doc.data()['status'] ?? '')
+                .toString()
+                .toLowerCase();
             return status == 'approved' || status == 'active';
           }).length;
-          
+
           final approvalRate = (approvedCount / loansProcessed * 100);
-          
+
           performers.add({
             "name": userName,
             "loansProcessed": loansProcessed,
@@ -191,7 +211,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           });
         }
       }
-      performers.sort((a, b) => (b['loansProcessed'] as int).compareTo(a['loansProcessed'] as int));
+      performers.sort(
+        (a, b) =>
+            (b['loansProcessed'] as int).compareTo(a['loansProcessed'] as int),
+      );
 
       if (mounted) {
         setState(() {
@@ -203,9 +226,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             "totalAmount": totalAmount,
             "approvedAmount": approvedAmount,
             "pendingAmount": pendingAmount,
-            "averageLoanAmount": totalLoans > 0 ? totalAmount / totalLoans : 0.0,
-            "averageProcessingTime": processedLoans > 0 ? "${(totalProcessingDays / processedLoans).toStringAsFixed(1)} days" : "0 days",
-            "approvalRate": totalLoans > 0 ? (approvedLoans / totalLoans * 100) : 0.0,
+            "averageLoanAmount": totalLoans > 0
+                ? totalAmount / totalLoans
+                : 0.0,
+            "averageProcessingTime": processedLoans > 0
+                ? "${(totalProcessingDays / processedLoans).toStringAsFixed(1)} days"
+                : "0 days",
+            "approvalRate": totalLoans > 0
+                ? (approvedLoans / totalLoans * 100)
+                : 0.0,
           };
           monthlyTrends = trends;
           loanTypeDistribution = distribution;
@@ -287,456 +316,359 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadAnalyticsData,
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Period Selector
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: Row(
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.calendar_today, size: 20, color: Colors.black54),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildPeriodChip('Today'),
-                          const SizedBox(width: 8),
-                          _buildPeriodChip('This Week'),
-                          const SizedBox(width: 8),
-                          _buildPeriodChip('This Month'),
-                          const SizedBox(width: 8),
-                          _buildPeriodChip('This Year'),
-                        ],
-                      ),
-                    ),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadAnalyticsData,
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
-            ),
-            
-            // Key Metrics Grid
-            Padding(
-              padding: const EdgeInsets.all(16),
+            )
+          : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Key Metrics',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.4,
-                    children: [
-                      _buildMetricCard(
-                        'Total Loans',
-                        analyticsData['totalLoans'].toString(),
-                        Icons.description_outlined,
-                        Colors.blue,
-                        '+12.5%',
-                      ),
-                      _buildMetricCard(
-                        'Approved',
-                        analyticsData['approvedLoans'].toString(),
-                        Icons.check_circle_outline,
-                        Colors.green,
-                        '+8.3%',
-                      ),
-                      _buildMetricCard(
-                        'Pending',
-                        analyticsData['pendingLoans'].toString(),
-                        Icons.pending_outlined,
-                        Colors.orange,
-                        '+5.2%',
-                      ),
-                      _buildMetricCard(
-                        'Rejected',
-                        analyticsData['rejectedLoans'].toString(),
-                        Icons.cancel_outlined,
-                        Colors.red,
-                        '-3.1%',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Financial Overview
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Financial Overview',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[200]!),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _buildFinancialRow(
-                            'Total Loan Amount',
-                            currencyFormat.format(analyticsData['totalAmount']),
-                            Colors.blue,
-                          ),
-                          const Divider(height: 24),
-                          _buildFinancialRow(
-                            'Approved Amount',
-                            currencyFormat.format(analyticsData['approvedAmount']),
-                            Colors.green,
-                          ),
-                          const Divider(height: 24),
-                          _buildFinancialRow(
-                            'Pending Amount',
-                            currencyFormat.format(analyticsData['pendingAmount']),
-                            Colors.orange,
-                          ),
-                          const Divider(height: 24),
-                          _buildFinancialRow(
-                            'Average Loan',
-                            currencyFormat.format(analyticsData['averageLoanAmount']),
-                            Colors.purple,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Loan Type Distribution
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Loan Type Distribution',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[200]!),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: loanTypeDistribution.map((item) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                  // Period Selector
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: Colors.black54,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: item['color'],
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          item['type'],
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    Text(
-                                      '${item['count']} (${item['percentage']}%)',
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: item['percentage'] / 100,
-                                    backgroundColor: Colors.grey[200],
-                                    valueColor: AlwaysStoppedAnimation<Color>(item['color']),
-                                    minHeight: 8,
+                                _buildPeriodChip('Today'),
+                                const SizedBox(width: 8),
+                                _buildPeriodChip('This Week'),
+                                const SizedBox(width: 8),
+                                _buildPeriodChip('This Month'),
+                                const SizedBox(width: 8),
+                                _buildPeriodChip('This Year'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Key Metrics Grid
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Key Metrics',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.4,
+                          children: [
+                            _buildMetricCard(
+                              'Total Loans',
+                              analyticsData['totalLoans'].toString(),
+                              Icons.description_outlined,
+                              Colors.blue,
+                              '+12.5%',
+                            ),
+                            _buildMetricCard(
+                              'Approved',
+                              analyticsData['approvedLoans'].toString(),
+                              Icons.check_circle_outline,
+                              Colors.green,
+                              '+8.3%',
+                            ),
+                            _buildMetricCard(
+                              'Pending',
+                              analyticsData['pendingLoans'].toString(),
+                              Icons.pending_outlined,
+                              Colors.orange,
+                              '+5.2%',
+                            ),
+                            _buildMetricCard(
+                              'Rejected',
+                              analyticsData['rejectedLoans'].toString(),
+                              Icons.cancel_outlined,
+                              Colors.red,
+                              '-3.1%',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Financial Overview
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Financial Overview',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                _buildFinancialRow(
+                                  'Total Loan Amount',
+                                  currencyFormat.format(
+                                    analyticsData['totalAmount'],
                                   ),
+                                  Colors.blue,
+                                ),
+                                const Divider(height: 24),
+                                _buildFinancialRow(
+                                  'Approved Amount',
+                                  currencyFormat.format(
+                                    analyticsData['approvedAmount'],
+                                  ),
+                                  Colors.green,
+                                ),
+                                const Divider(height: 24),
+                                _buildFinancialRow(
+                                  'Pending Amount',
+                                  currencyFormat.format(
+                                    analyticsData['pendingAmount'],
+                                  ),
+                                  Colors.orange,
+                                ),
+                                const Divider(height: 24),
+                                _buildFinancialRow(
+                                  'Average Loan',
+                                  currencyFormat.format(
+                                    analyticsData['averageLoanAmount'],
+                                  ),
+                                  Colors.purple,
                                 ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                      ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-            // Monthly Trends
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Monthly Trends',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[200]!),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          // Simple bar chart representation
-                          SizedBox(
-                            height: 200,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: monthlyTrends.map((data) {
-                                final maxApplications = monthlyTrends
-                                    .map((e) => e['applications'] as int)
-                                    .reduce((a, b) => a > b ? a : b);
-                                final height = (data['applications'] as int) / maxApplications * 150;
-                                
-                                return Column(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      data['applications'].toString(),
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
+                  // Loan Type Distribution
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Loan Type Distribution',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: loanTypeDistribution.map((item) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: item['color'],
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                item['type'],
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.black87,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            '${item['count']} (${item['percentage']}%)',
+                                            style: TextStyle(
+                                              color: Colors.black54,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      width: 40,
-                                      height: height,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1E88E5),
+                                      const SizedBox(height: 8),
+                                      ClipRRect(
                                         borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: item['percentage'] / 100,
+                                          backgroundColor: Colors.grey[200],
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                item['color'],
+                                              ),
+                                          minHeight: 8,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      data['month'],
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 );
                               }).toList(),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF1E88E5),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Applications',
-                                style: TextStyle(fontSize: 12, color: Colors.black54),
-                              ),
-                            ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Monthly Trends
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Monthly Trends',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Performance Metrics
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Performance Metrics',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildPerformanceCard(
-                          'Approval Rate',
-                          '${analyticsData['approvalRate']}%',
-                          Icons.trending_up,
-                          Colors.green,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildPerformanceCard(
-                          'Avg Processing',
-                          analyticsData['averageProcessingTime'],
-                          Icons.access_time,
-                          Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                        const SizedBox(height: 16),
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                // Simple bar chart representation
+                                SizedBox(
+                                  height: 200,
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: monthlyTrends.map((data) {
+                                      final maxApplications = monthlyTrends
+                                          .map((e) => e['applications'] as int)
+                                          .reduce((a, b) => a > b ? a : b);
+                                      final height =
+                                          (data['applications'] as int) /
+                                          maxApplications *
+                                          150;
 
-            const SizedBox(height: 24),
-
-            // Top Performers
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Top Performers',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: topPerformers.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final performer = topPerformers[index];
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey[200]!),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: const TextStyle(
-                                      color: Colors.blue,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
-                                    ),
+                                      return Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            data['applications'].toString(),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            width: 40,
+                                            height: height,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF1E88E5),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            data['month'],
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
-                                      performer['name'],
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: Colors.black87,
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF1E88E5),
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${performer['loansProcessed']} loans • ${performer['approvalRate']}% approval',
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'Applications',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.black54,
@@ -744,36 +676,166 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     ),
                                   ],
                                 ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  const Icon(Icons.timer_outlined, size: 16, color: Colors.black54),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    performer['avgProcessingTime'],
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Performance Metrics
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Performance Metrics',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildPerformanceCard(
+                                'Approval Rate',
+                                '${analyticsData['approvalRate']}%',
+                                Icons.trending_up,
+                                Colors.green,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildPerformanceCard(
+                                'Avg Processing',
+                                analyticsData['averageProcessingTime'],
+                                Icons.access_time,
+                                Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Top Performers
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Top Performers',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: topPerformers.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final performer = topPerformers[index];
+                            return Card(
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.grey[200]!),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue[50],
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: const TextStyle(
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            performer['name'],
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${performer['loansProcessed']} loans • ${performer['approvalRate']}% approval',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        const Icon(
+                                          Icons.timer_outlined,
+                                          size: 16,
+                                          color: Colors.black54,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          performer['avgProcessingTime'],
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
       bottomNavigationBar: BottomAppBar(
         height: 70,
         padding: EdgeInsets.zero,
@@ -849,7 +911,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: change.startsWith('+') ? Colors.green[50] : Colors.red[50],
+                  color: change.startsWith('+')
+                      ? Colors.green[50]
+                      : Colors.red[50],
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -872,13 +936,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               color: Colors.black87,
             ),
           ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black54,
-            ),
-          ),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.black54)),
         ],
       ),
     );
@@ -893,19 +951,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black54,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 14, color: Colors.black54)),
           ],
         ),
         Text(
@@ -948,10 +997,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black54,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.black54),
             textAlign: TextAlign.center,
           ),
         ],

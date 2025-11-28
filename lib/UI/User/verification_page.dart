@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../../layout/theme.dart';
-import '../../Services/firebase_service.dart';  
+import '../../Services/firebase_service.dart';
 import '../../Services/cloudinary_service.dart';
 
 class VerificationPage extends StatefulWidget {
@@ -121,11 +121,11 @@ class _VerificationPageState extends State<VerificationPage> {
     }
 
     setState(() => _isSubmitting = true);
-    
+
     try {
       // Upload image to Cloudinary first
       final imageUrl = await _cloudinaryService.uploadImage(_selectedImage!);
-      
+
       if (imageUrl == null) {
         throw Exception('Failed to upload image. Please try again.');
       }
@@ -372,7 +372,8 @@ class _VerificationPageState extends State<VerificationPage> {
                                     );
                                   }
                                   return const Center(
-                                      child: CircularProgressIndicator());
+                                    child: CircularProgressIndicator(),
+                                  );
                                 },
                               )
                             : const SizedBox.shrink(),

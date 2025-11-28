@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -16,7 +15,7 @@ class _UsersScreenState extends State<UsersScreen> {
   String _searchQuery = '';
   bool _isLoading = true;
   String? _error;
-  
+
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> filteredUsers = [];
 
@@ -38,30 +37,32 @@ class _UsersScreenState extends State<UsersScreen> {
           .get();
 
       final List<Map<String, dynamic>> loadedUsers = [];
-      
+
       for (var doc in usersSnapshot.docs) {
         final data = doc.data();
         final userId = doc.id;
-        
+
         // Get user's loans to calculate statistics
         final loansSnapshot = await FirebaseFirestore.instance
             .collection('loans')
             .where('userId', isEqualTo: userId)
             .get();
-        
+
         int totalLoans = loansSnapshot.docs.length;
         int activeLoans = loansSnapshot.docs.where((loanDoc) {
-          final status = (loanDoc.data()['status'] ?? '').toString().toLowerCase();
+          final status = (loanDoc.data()['status'] ?? '')
+              .toString()
+              .toLowerCase();
           return status == 'approved' || status == 'active';
         }).length;
-        
+
         // Calculate credit score (simplified - based on loan history)
         int creditScore = 650; // Base score
         if (totalLoans > 0) {
           creditScore += (activeLoans * 10); // Bonus for active loans
           creditScore = creditScore.clamp(300, 850);
         }
-        
+
         // Helper function to safely convert date fields
         String getDateString(dynamic dateField) {
           if (dateField == null) return DateTime.now().toString();
@@ -69,7 +70,7 @@ class _UsersScreenState extends State<UsersScreen> {
           if (dateField is String) return dateField;
           return DateTime.now().toString();
         }
-        
+
         loadedUsers.add({
           "id": userId,
           "name": data['fullName'] ?? data['name'] ?? 'Unknown User',
@@ -105,16 +106,22 @@ class _UsersScreenState extends State<UsersScreen> {
 
   void _applyFilters() {
     var filtered = users;
-    
+
     // Filter by status/role
     if (_selectedFilter != 'All') {
-      if (_selectedFilter == 'Active' || _selectedFilter == 'Inactive' || _selectedFilter == 'Suspended') {
-        filtered = filtered.where((user) => user['status'] == _selectedFilter).toList();
+      if (_selectedFilter == 'Active' ||
+          _selectedFilter == 'Inactive' ||
+          _selectedFilter == 'Suspended') {
+        filtered = filtered
+            .where((user) => user['status'] == _selectedFilter)
+            .toList();
       } else {
-        filtered = filtered.where((user) => user['role'] == _selectedFilter).toList();
+        filtered = filtered
+            .where((user) => user['role'] == _selectedFilter)
+            .toList();
       }
     }
-    
+
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((user) {
@@ -122,10 +129,12 @@ class _UsersScreenState extends State<UsersScreen> {
         final email = user['email'].toString().toLowerCase();
         final id = user['id'].toString().toLowerCase();
         final query = _searchQuery.toLowerCase();
-        return name.contains(query) || email.contains(query) || id.contains(query);
+        return name.contains(query) ||
+            email.contains(query) ||
+            id.contains(query);
       }).toList();
     }
-    
+
     setState(() {
       filteredUsers = filtered;
     });
@@ -195,7 +204,7 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget _buildUserDetailsSheet(Map<String, dynamic> user) {
     final dateFormat = DateFormat('MMM d, yyyy');
     final dateTimeFormat = DateFormat('MMM d, yyyy HH:mm');
-    
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
@@ -253,7 +262,10 @@ class _UsersScreenState extends State<UsersScreen> {
               const SizedBox(height: 8),
               Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: getRoleColor(user['role']).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -314,7 +326,9 @@ class _UsersScreenState extends State<UsersScreen> {
                       onPressed: () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Edit functionality coming soon')),
+                          const SnackBar(
+                            content: Text('Edit functionality coming soon'),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.edit_outlined),
@@ -329,13 +343,15 @@ class _UsersScreenState extends State<UsersScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () async {
-                        final newStatus = user['status'] == 'Active' ? 'Suspended' : 'Active';
+                        final newStatus = user['status'] == 'Active'
+                            ? 'Suspended'
+                            : 'Active';
                         try {
                           await FirebaseFirestore.instance
                               .collection('Account')
                               .doc(user['id'])
                               .update({'status': newStatus});
-                          
+
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -362,7 +378,9 @@ class _UsersScreenState extends State<UsersScreen> {
                             ? Icons.block
                             : Icons.check_circle_outline,
                       ),
-                      label: Text(user['status'] == 'Active' ? 'Suspend' : 'Activate'),
+                      label: Text(
+                        user['status'] == 'Active' ? 'Suspend' : 'Activate',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: user['status'] == 'Active'
                             ? Colors.red
@@ -392,10 +410,7 @@ class _UsersScreenState extends State<UsersScreen> {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.black54,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
               const SizedBox(height: 4),
               Text(
@@ -450,309 +465,379 @@ class _UsersScreenState extends State<UsersScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadUsers,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                // Search and Filter Section
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
+                      // Search Bar
+                      TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                          _applyFilters();
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search by name, email or ID...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1E88E5),
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadUsers,
-                        child: const Text('Retry'),
+                      // Filter Chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildFilterChip('All'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Active'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Inactive'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Suspended'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Admin'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Borrower'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                )
-              : Column(
-        children: [
-          // Search and Filter Section
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Search Bar
-                TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                    _applyFilters();
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, email or ID...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF1E88E5)),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                  ),
                 ),
-                const SizedBox(height: 16),
-                // Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
+                // Stats Summary
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  color: Colors.blue[50],
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildFilterChip('All'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Active'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Inactive'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Suspended'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Admin'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Borrower'),
+                      _buildStatItem(
+                        'Total',
+                        users.length.toString(),
+                        Colors.blue,
+                      ),
+                      _buildStatItem(
+                        'Active',
+                        users
+                            .where((u) => u['status'] == 'Active')
+                            .length
+                            .toString(),
+                        Colors.green,
+                      ),
+                      _buildStatItem(
+                        'Borrowers',
+                        users
+                            .where((u) => u['role'] == 'Borrower')
+                            .length
+                            .toString(),
+                        Colors.orange,
+                      ),
+                      _buildStatItem(
+                        'Admins',
+                        users
+                            .where((u) => u['role'] == 'Admin')
+                            .length
+                            .toString(),
+                        Colors.purple,
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          // Stats Summary
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Colors.blue[50],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Total', users.length.toString(), Colors.blue),
-                _buildStatItem(
-                  'Active',
-                  users.where((u) => u['status'] == 'Active').length.toString(),
-                  Colors.green,
-                ),
-                _buildStatItem(
-                  'Borrowers',
-                  users.where((u) => u['role'] == 'Borrower').length.toString(),
-                  Colors.orange,
-                ),
-                _buildStatItem(
-                  'Admins',
-                  users.where((u) => u['role'] == 'Admin').length.toString(),
-                  Colors.purple,
-                ),
-              ],
-            ),
-          ),
-          // Users List
-          Expanded(
-            child: filteredUsers.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.person_off_outlined, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No users found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.black54,
+                // Users List
+                Expanded(
+                  child: filteredUsers.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_off_outlined,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No users found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredUsers.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final user = filteredUsers[index];
-                      final statusColor = getStatusColor(user['status']);
-                      final roleColor = getRoleColor(user['role']);
-                      
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.grey[200]!),
-                        ),
-                        child: InkWell(
-                          onTap: () => _viewUserDetails(user),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor: Colors.blue[50],
-                                      radius: 24,
-                                      child: Text(
-                                        user['name'].toString().substring(0, 1),
-                                        style: const TextStyle(
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredUsers.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final user = filteredUsers[index];
+                            final statusColor = getStatusColor(user['status']);
+                            final roleColor = getRoleColor(user['role']);
+
+                            return Card(
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.grey[200]!),
+                              ),
+                              child: InkWell(
+                                onTap: () => _viewUserDetails(user),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  user['name'],
-                                                  style: theme.textTheme.titleMedium?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.black87,
-                                                  ),
-                                                ),
+                                          CircleAvatar(
+                                            backgroundColor: Colors.blue[50],
+                                            radius: 24,
+                                            child: Text(
+                                              user['name'].toString().substring(
+                                                0,
+                                                1,
                                               ),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor.withOpacity(0.1),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  user['status'],
-                                                  style: theme.textTheme.labelSmall?.copyWith(
-                                                    color: statusColor,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
+                                              style: const TextStyle(
+                                                color: Colors.blue,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
                                               ),
-                                            ],
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Text(
-                                                user['id'],
-                                                style: theme.textTheme.bodySmall?.copyWith(
-                                                  color: Colors.black54,
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        user['name'],
+                                                        style: theme
+                                                            .textTheme
+                                                            .titleMedium
+                                                            ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Colors
+                                                                  .black87,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: statusColor
+                                                            .withOpacity(0.1),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              12,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        user['status'],
+                                                        style: theme
+                                                            .textTheme
+                                                            .labelSmall
+                                                            ?.copyWith(
+                                                              color:
+                                                                  statusColor,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 6,
-                                                  vertical: 2,
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      user['id'],
+                                                      style: theme
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(
+                                                            color:
+                                                                Colors.black54,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 6,
+                                                            vertical: 2,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: roleColor
+                                                            .withOpacity(0.1),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        user['role'],
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: roleColor,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                                decoration: BoxDecoration(
-                                                  color: roleColor.withOpacity(0.1),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  user['role'],
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: roleColor,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Icon(Icons.email_outlined, size: 14, color: Colors.black54),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        user['email'],
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.black54,
+                                      const SizedBox(height: 12),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.email_outlined,
+                                            size: 14,
+                                            color: Colors.black54,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              user['email'],
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black54,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.phone_outlined,
+                                            size: 14,
+                                            color: Colors.black54,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            user['phone'],
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Icon(
+                                            Icons.access_time_outlined,
+                                            size: 14,
+                                            color: Colors.black54,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            dateTimeFormat.format(
+                                              DateTime.parse(user['lastLogin']),
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (user['role'] == 'Borrower') ...[
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceAround,
+                                          children: [
+                                            _buildUserStatItem(
+                                              'Credit Score',
+                                              user['creditScore'].toString(),
+                                              Icons.credit_score,
+                                            ),
+                                            _buildUserStatItem(
+                                              'Total Loans',
+                                              user['totalLoans'].toString(),
+                                              Icons.description,
+                                            ),
+                                            _buildUserStatItem(
+                                              'Active',
+                                              user['activeLoans'].toString(),
+                                              Icons.pending_actions,
+                                            ),
+                                          ],
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Icon(Icons.phone_outlined, size: 14, color: Colors.black54),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      user['phone'],
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Icon(Icons.access_time_outlined, size: 14, color: Colors.black54),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      dateTimeFormat.format(DateTime.parse(user['lastLogin'])),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.black54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (user['role'] == 'Borrower') ...[
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                    children: [
-                                      _buildUserStatItem(
-                                        'Credit Score',
-                                        user['creditScore'].toString(),
-                                        Icons.credit_score,
-                                      ),
-                                      _buildUserStatItem(
-                                        'Total Loans',
-                                        user['totalLoans'].toString(),
-                                        Icons.description,
-                                      ),
-                                      _buildUserStatItem(
-                                        'Active',
-                                        user['activeLoans'].toString(),
-                                        Icons.pending_actions,
-                                      ),
+                                      ],
                                     ],
                                   ),
-                                ],
-                              ],
-                            ),
-                          ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
       bottomNavigationBar: BottomAppBar(
         height: 70,
         padding: EdgeInsets.zero,
@@ -808,13 +893,7 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.black54,
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, color: Colors.black54)),
       ],
     );
   }
@@ -832,13 +911,7 @@ class _UsersScreenState extends State<UsersScreen> {
             color: Colors.black87,
           ),
         ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.black54,
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.black54)),
       ],
     );
   }

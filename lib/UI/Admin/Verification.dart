@@ -95,10 +95,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
       _safeSetState(() {
         _selectedIndex = index;
       });
-      
+
       // Only navigate if the widget is still mounted
       if (!mounted) return;
-      
+
       // Navigate to appropriate screen
       switch (index) {
         case 0:
@@ -122,20 +122,24 @@ class _VerificationScreenState extends State<VerificationScreen> {
     return Expanded(
       child: InkWell(
         onTap: () => _onItemTapped(index),
-        child: Container(
+        child: SizedBox(
           height: 70.0,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                color: isSelected ? const Color(0xFF1E88E5) : const Color(0xFF9E9E9E),
+                color: isSelected
+                    ? const Color(0xFF1E88E5)
+                    : const Color(0xFF9E9E9E),
                 size: 24.0,
               ),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFF1E88E5) : const Color(0xFF9E9E9E),
+                  color: isSelected
+                      ? const Color(0xFF1E88E5)
+                      : const Color(0xFF9E9E9E),
                   fontSize: 12.0,
                   fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
                 ),
@@ -149,12 +153,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   Future<void> _loadVerificationRequests() async {
     if (!_isMounted || _isDisposed) return;
-    
+
     _safeSetState(() {
       _isLoading = true;
       _error = null;
     });
-    
+
     try {
       final querySnapshot = await _firestore
           .collection('verificationRequests')
@@ -176,35 +180,41 @@ class _VerificationScreenState extends State<VerificationScreen> {
               dateSubmitted: DateTime.now(),
             );
           }
-          
+
           try {
             final data = doc.data();
             String name = 'Loading...';
             String? userId;
-            
+
             try {
               userId = data['userId']?.toString();
               if (userId != null && userId.isNotEmpty) {
                 // First, try to get the name from the verification request data
                 name = data['fullName'] ?? data['name'] ?? 'User ID: $userId';
-                
+
                 // If not found in verification request, try the Account collection
                 if (name == 'User ID: $userId') {
-                  final userDoc = await _firestore.collection('Account').doc(userId).get();
+                  final userDoc = await _firestore
+                      .collection('Account')
+                      .doc(userId)
+                      .get();
                   if (userDoc.exists) {
                     final userData = userDoc.data();
-                    name = userData?['fullName'] ?? 
-                           userData?['name'] ?? 
-                           userData?['displayName'] ?? 
-                           name; // Keep the existing name if not found
+                    name =
+                        userData?['fullName'] ??
+                        userData?['name'] ??
+                        userData?['displayName'] ??
+                        name; // Keep the existing name if not found
                   } else {
-                    debugPrint('User document not found in Account collection for ID: $userId');
-                    
+                    debugPrint(
+                      'User document not found in Account collection for ID: $userId',
+                    );
+
                     // If we have an email but no name, use the email prefix as name
                     if (data['email'] != null) {
                       final email = data['email'].toString();
                       name = email.split('@').first;
-                      
+
                       // Try to create the account document with available data
                       try {
                         await _firestore.collection('Account').doc(userId).set({
@@ -212,8 +222,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                           'fullName': name,
                           'createdAt': FieldValue.serverTimestamp(),
                         }, SetOptions(merge: true));
-                        
-                        debugPrint('Created account document for user: $userId');
+
+                        debugPrint(
+                          'Created account document for user: $userId',
+                        );
                       } catch (e) {
                         debugPrint('Error creating account document: $e');
                       }
@@ -221,7 +233,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   }
                 }
               } else {
-                debugPrint('Invalid or missing userId in verification request: ${doc.id}');
+                debugPrint(
+                  'Invalid or missing userId in verification request: ${doc.id}',
+                );
                 name = 'Unknown User';
               }
             } catch (e) {
@@ -237,7 +251,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
               idImageUrl: data['idImageUrl']?.toString() ?? '',
               additionalInfo: data['additionalInfo']?.toString(),
               status: (data['status'] as String?)?.capitalize() ?? 'Pending',
-              dateSubmitted: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+              dateSubmitted:
+                  (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
             );
           } catch (e) {
             debugPrint('Error processing verification request: $e');
@@ -255,7 +270,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
       );
 
       if (!_isMounted || _isDisposed) return;
-      
+
       _safeSetState(() {
         _requests.clear();
         _requests.addAll(requests.where((r) => r.id.isNotEmpty));
@@ -264,7 +279,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
     } catch (e) {
       debugPrint('Error loading verification requests: $e');
       if (!_isMounted || _isDisposed) return;
-      
+
       _safeSetState(() {
         _error = 'Failed to load verification requests: ${e.toString()}';
         _isLoading = false;
@@ -277,10 +292,13 @@ class _VerificationScreenState extends State<VerificationScreen> {
       return _requests;
     }
     return _requests.where((req) {
-      final matchesSearch = _searchQuery.isEmpty ||
+      final matchesSearch =
+          _searchQuery.isEmpty ||
           req.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           req.id.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesStatus = _statusFilter.isEmpty || req.status.toLowerCase() == _statusFilter.toLowerCase();
+      final matchesStatus =
+          _statusFilter.isEmpty ||
+          req.status.toLowerCase() == _statusFilter.toLowerCase();
       return matchesSearch && matchesStatus;
     }).toList();
   }
@@ -334,16 +352,16 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     const SizedBox(height: 4),
                     Text(
                       request.idType,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: Colors.black, fontSize: 14),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: request.statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
@@ -460,17 +478,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
                   const SizedBox(height: 16),
                   _buildDetailItem('Applicant', request.name),
                   _buildDetailItem('ID Type', request.idType),
-                  _buildDetailItem('Date Submitted', dateFormat.format(request.dateSubmitted)),
-                  if (request.additionalInfo != null && request.additionalInfo!.isNotEmpty)
-                    _buildDetailItem('Additional Info', request.additionalInfo!),
-                  
+                  _buildDetailItem(
+                    'Date Submitted',
+                    dateFormat.format(request.dateSubmitted),
+                  ),
+                  if (request.additionalInfo != null &&
+                      request.additionalInfo!.isNotEmpty)
+                    _buildDetailItem(
+                      'Additional Info',
+                      request.additionalInfo!,
+                    ),
+
                   const SizedBox(height: 24),
                   const Text(
                     'ID Document',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
                   if (request.idImageUrl.isNotEmpty)
@@ -487,9 +509,10 @@ class _VerificationScreenState extends State<VerificationScreen> {
                             color: Colors.grey[100],
                             child: Center(
                               child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
+                                value:
+                                    loadingProgress.expectedTotalBytes != null
                                     ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
+                                          loadingProgress.expectedTotalBytes!
                                     : null,
                               ),
                             ),
@@ -503,7 +526,11 @@ class _VerificationScreenState extends State<VerificationScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.error_outline, color: Colors.red, size: 32),
+                                  Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 32,
+                                  ),
                                   SizedBox(height: 8),
                                   Text('Failed to load image'),
                                 ],
@@ -521,9 +548,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey[300]!),
                       ),
-                      child: const Center(
-                        child: Text('No image provided'),
-                      ),
+                      child: const Center(child: Text('No image provided')),
                     ),
                 ],
               ),
@@ -620,7 +645,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Approve Verification'),
-        content: const Text('Are you sure you want to approve this verification request? This will mark the user as verified.'),
+        content: const Text(
+          'Are you sure you want to approve this verification request? This will mark the user as verified.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -632,21 +659,23 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 await _firestore.runTransaction((transaction) async {
                   // Update verification request status
                   transaction.update(
-                    _firestore.collection('verificationRequests').doc(request.id),
+                    _firestore
+                        .collection('verificationRequests')
+                        .doc(request.id),
                     {'status': 'approved'},
                   );
-                  
+
                   // Update user verification status
                   transaction.update(
                     _firestore.collection('Account').doc(request.userId),
                     {'isVerified': true},
                   );
                 });
-                
+
                 setState(() {
                   request.status = 'Approved';
                 });
-                
+
                 if (mounted) {
                   Navigator.pop(context); // Close dialog
                   Navigator.pop(context); // Close bottom sheet
@@ -668,7 +697,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.success),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.success,
+            ),
             child: const Text('Approve'),
           ),
         ],
@@ -710,15 +741,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 await _firestore
                     .collection('verificationRequests')
                     .doc(request.id)
-                    .update({
-                      'status': 'rejected',
-                      'rejectionReason': reason,
-                    });
-                
+                    .update({'status': 'rejected', 'rejectionReason': reason});
+
                 setState(() {
                   request.status = 'Rejected';
                 });
-                
+
                 if (mounted) {
                   Navigator.pop(context); // Close dialog
                   Navigator.pop(context); // Close bottom sheet
@@ -794,102 +822,104 @@ class _VerificationScreenState extends State<VerificationScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadVerificationRequests,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search requests...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                ),
+
+                // Status filter chips
+                Container(
+                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
                     children: [
-                      Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadVerificationRequests,
-                        child: const Text('Retry'),
-                      ),
+                      _buildStatusChip('All', ''),
+                      const SizedBox(width: 8),
+                      _buildStatusChip('Pending', 'Pending'),
+                      const SizedBox(width: 8),
+                      _buildStatusChip('Approved', 'Approved'),
+                      const SizedBox(width: 8),
+                      _buildStatusChip('Rejected', 'Rejected'),
                     ],
                   ),
-                )
-              : Column(
-                  children: [
-                    // Search bar
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search requests...',
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
-                      ),
-                    ),
-                    
-                    // Status filter chips
-                    Container(
-                      height: 50,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildStatusChip('All', ''),
-                          const SizedBox(width: 8),
-                          _buildStatusChip('Pending', 'Pending'),
-                          const SizedBox(width: 8),
-                          _buildStatusChip('Approved', 'Approved'),
-                          const SizedBox(width: 8),
-                          _buildStatusChip('Rejected', 'Rejected'),
-                        ],
-                      ),
-                    ),
-                    
-                    // Request list
-                    Expanded(
-                      child: _filteredRequests.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.assignment_outlined,
-                                    size: 64,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No verification requests found',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _loadVerificationRequests,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _filteredRequests.length,
-                                itemBuilder: (context, index) {
-                                  return _buildRequestCard(_filteredRequests[index]);
-                                },
-                              ),
-                            ),
-                    ),
-                  ],
                 ),
+
+                // Request list
+                Expanded(
+                  child: _filteredRequests.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.assignment_outlined,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No verification requests found',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadVerificationRequests,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredRequests.length,
+                            itemBuilder: (context, index) {
+                              return _buildRequestCard(
+                                _filteredRequests[index],
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            ),
       bottomNavigationBar: Container(
         height: 70.0,
         decoration: BoxDecoration(
