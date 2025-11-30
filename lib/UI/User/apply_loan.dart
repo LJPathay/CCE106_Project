@@ -109,8 +109,8 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
       return;
     }
     final termData = _loanTerms[_selectedTerm]!;
-    final months = termData['months'] as double;
-    final interestRate = termData['interestRate'] as double;
+    final months = (termData['months'] as num).toDouble();
+    final interestRate = (termData['interestRate'] as num).toDouble();
 
     // Use simple interest for all terms: Total = Principal * (1 + rate/100)
     final total = a * (1 + (interestRate / 100));
@@ -414,14 +414,14 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF2E3192), Color(0xFF1BFFFF)],
+                    colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2E3192).withValues(alpha: 0.3),
+                      color: const Color(0xFF1A237E).withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -548,7 +548,8 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                         }
 
                         final termData = _loanTerms[_selectedTerm]!;
-                        final interestRate = termData['interestRate'] as double;
+                        final interestRate = (termData['interestRate'] as num)
+                            .toDouble();
 
                         await _firebaseService.submitLoanApplication(
                           amount: amount,
