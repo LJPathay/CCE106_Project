@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../layout/theme.dart';
 import '../../Services/firebase_service.dart';
@@ -15,19 +14,23 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
   final TextEditingController _amountController = TextEditingController();
 
   final Map<String, Map<String, dynamic>> _loanTerms = {
-    '7 days - 15%': {'months': 0.23, 'interestRate': 15.0, 'label': '7 days'},
-    '14 days - 12%': {'months': 0.47, 'interestRate': 12.0, 'label': '14 days'},
-    '1 month - 8%': {'months': 1, 'interestRate': 8.0, 'label': '1 month'},
-    '3 months - 5%': {'months': 3, 'interestRate': 5.0, 'label': '3 months'},
-    '6 months - 4%': {'months': 6, 'interestRate': 4.0, 'label': '6 months'},
-    '12 months - 3.5%': {
+    '7 days - 5%': {'months': 0.23, 'interestRate': 5.0, 'label': '7 days'},
+    '14 days - 4%': {'months': 0.47, 'interestRate': 4.0, 'label': '14 days'},
+    '1 month - 3%': {'months': 1, 'interestRate': 3.0, 'label': '1 month'},
+    '3 months - 2.5%': {'months': 3, 'interestRate': 2.5, 'label': '3 months'},
+    '6 months - 2%': {'months': 6, 'interestRate': 2.0, 'label': '6 months'},
+    '12 months - 1.8%': {
       'months': 12,
-      'interestRate': 3.5,
+      'interestRate': 1.8,
       'label': '12 months',
     },
-    '24 months - 3%': {'months': 24, 'interestRate': 3.0, 'label': '24 months'},
+    '24 months - 1.5%': {
+      'months': 24,
+      'interestRate': 1.5,
+      'label': '24 months',
+    },
   };
-  String _selectedTerm = '3 months - 5%';
+  String _selectedTerm = '3 months - 2.5%';
 
   final List<String> _loanPurposes = [
     'Personal/Emergency',
@@ -109,14 +112,10 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
     final months = termData['months'] as double;
     final interestRate = termData['interestRate'] as double;
 
-    double total;
-    if (months < 1) {
-      total = a * (1 + (interestRate / 100));
-    } else {
-      final rate = interestRate / 100;
-      total = a * pow((1 + rate), months);
-    }
+    // Use simple interest for all terms: Total = Principal * (1 + rate/100)
+    final total = a * (1 + (interestRate / 100));
     final monthly = months < 1 ? total : total / months;
+
     setState(() {
       _total = total;
       _monthly = monthly;
