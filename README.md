@@ -1,72 +1,44 @@
-# cce106_finance_project
+## How to Guide
 
-A Flutter + Firebase starter with user authentication (login/register), configurable dashboard, and clean modern UI.
+# 1. Clone The Repository
+  - git clone https://github.com/LJPathay/CCE106_Project.git
+  - cd CCE106_Project
 
----
+# 2. Configure Your Firebase
+  - Install firebase CLI and Flutterfire ( watch youtube video on how to do it )
+  - Flutter login
+  - Flutterfire configure (Create a Furebase Project first)
 
-## Getting Started
+# 3. Go to Firebase Google 
+  - Create new Firebase project
+  - On the Left side click 'Build' -> Firebase Database
+  - Build -> Authentication (Sign-in Method -> email/password)
+  - Go to Firebase Collection and create these Collections:
+  1.) loan_applicants
+    - address (string)
+    - createdAt (timestamp)
+    - email (string)
+    - fullName (string)
+    - phone (string)
+      
+  2.) loans
+    - just add randoms it'll just generate it self after doing a loan
 
-### Prerequisites
+  3.) payments
+  4.) users
+  5.) verificationRequests
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.x or newer)
-- [Git](https://git-scm.com/)
-- A code editor (VS Code, Android Studio, etc.)
-- Web/Android/iOS enabled via Flutter tools
+# 4. Cloudinary Configuration 
+  - Go to Cloudinary ( Create a account)
+  - Go to Image and get the cloud_name, api_key, and api_secret from the dashboard
+  - Change the configuration file in Services/cloudinary_service.dart
+  - Change this line of code to your own cloudinary cloud_name and upload_Preset
+      - static const String _cloudName = 'dzlqpn3yb';
+      - static const String _uploadPreset = 'verification_images';
 
-### 1. Clone the Repository
-- Run:
-  ```
-  git clone https://github.com/LJPathay/CCE106_Project.git
-  cd CCE106_Projec
-  ```
-
-### 2. Install Dependencies
- ```
-  flutter pub get
- ```
-
-### 3. Firebase Setup
-
-Firebase is already pre-configured in `lib/firebase_options.dart` for web, Android, iOS, macOS, and Windows.
-
-#### To update for YOUR OWN Firebase project:
-
-- Go to [Firebase Console](https://console.firebase.google.com/), create your project.
-- Run:
-    ```
-    dart pub global activate flutterfire_cli
-    flutterfire configure
-    ```
-- Replace/add any required files like `google-services.json` (Android) or `GoogleService-Info.plist` (iOS).
-
-### 4. Run the App
+# 5. Run the Project
+  - Go to main.dart and run
+  - or
+  - Go to Terminal and type Flutter run
 
 
- ```
-  flutter run
-    or
- Web: 
-flutter run -d chrome
-Android:
-flutter run -d android
-iOS(on macOS):  
-flutter run -d ios
- ```
-
-### 5. Using the App
-
-- Register a new account from the registration page.
-- Login with your credentials.
-- Upon successful login, a dashboard screen will confirm access.
-
-### 6. Troubleshooting
-
-- If Firebase throws initialization errors, verify your Firebase configuration.
-- For pub errors, try `flutter clean` then `flutter pub get`.
-- Confirm Flutter/Dart/Firebase package versions are up-to-date.
-
----
-
-> **Resources**:  
-> - [Flutter Documentation](https://docs.flutter.dev/)
-> - [FlutterFire Setup](https://firebase.flutter.dev/docs/overview)
