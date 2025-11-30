@@ -14,6 +14,7 @@
   - On the Left side click 'Build' -> Firebase Database
   - Build -> Authentication (Sign-in Method -> email/password)
   - Go to Firebase Collection and create these Collections:
+  
   1.) loan_applicants
     - address (string)
     - createdAt (timestamp)
@@ -25,7 +26,9 @@
     - just add randoms it'll just generate it self after doing a loan
 
   3.) payments
+  
   4.) users
+  
   5.) verificationRequests
 
 # 4. Cloudinary Configuration 
