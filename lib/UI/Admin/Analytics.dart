@@ -275,7 +275,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -386,7 +385,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           crossAxisCount: 2,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 1.4,
+                          childAspectRatio: 1.2,
                           children: [
                             _buildMetricCard(
                               'Total Loans',
@@ -833,20 +832,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ],
               ),
             ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.attach_money, 'Loans', 1),
-            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
-            _buildNavItem(Icons.person_outline, 'Users', 4),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
           ],
+        ),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined, size: 24),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.credit_card, size: 24),
+              label: 'Loans',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined, size: 24),
+              label: 'Verify',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_outlined, size: 24),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline, size: 24),
+              label: 'Users',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          iconSize: 24,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          onTap: _onItemTapped,
         ),
       ),
     );
@@ -900,7 +928,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -954,12 +982,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             Text(label, style: TextStyle(fontSize: 14, color: Colors.black54)),
           ],
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -998,38 +1029,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blue[800] : Colors.black54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

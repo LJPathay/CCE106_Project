@@ -36,11 +36,18 @@ class CloudinaryService {
         mimeType = lookupMimeType(file.name) ?? 'image/jpeg';
         extension = file.name.split('.').last;
       } else {
-        // For mobile, we receive a File
-        final file = imageFile as File;
-        bytes = await file.readAsBytes();
-        mimeType = lookupMimeType(file.path) ?? 'image/jpeg';
-        extension = path.extension(file.path).replaceAll('.', '');
+        // For mobile, handle both XFile and File
+        String filePath;
+        if (imageFile is XFile) {
+          filePath = imageFile.path;
+          bytes = await imageFile.readAsBytes();
+        } else {
+          final file = imageFile as File;
+          filePath = file.path;
+          bytes = await file.readAsBytes();
+        }
+        mimeType = lookupMimeType(filePath) ?? 'image/jpeg';
+        extension = path.extension(filePath).replaceAll('.', '');
       }
 
       // Create the multipart request

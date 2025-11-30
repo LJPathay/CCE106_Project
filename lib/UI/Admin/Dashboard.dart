@@ -198,18 +198,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _handleLogout() async {
+    await FirebaseAuth.instance.signOut();
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currencyFormat = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
     final dateFormat = DateFormat('MMM d, yyyy');
-
-    void handleLogout() async {
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -229,7 +229,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             onSelected: (value) {
               if (value == 'logout') {
-                handleLogout();
+                _handleLogout();
               }
             },
             itemBuilder: (BuildContext context) => [
@@ -290,9 +290,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 0.9,
                         children: [
                           _buildStatCard(
                             'Total number of Applicants',
@@ -384,7 +384,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: statusColor.withOpacity(0.1),
+                                            color: statusColor.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
@@ -425,20 +425,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.attach_money, 'Loans', 1),
-            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
-            _buildNavItem(Icons.person_outline, 'Users', 4),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
           ],
+        ),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined, size: 24),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.credit_card, size: 24),
+              label: 'Loans',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined, size: 24),
+              label: 'Verify',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_outlined, size: 24),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline, size: 24),
+              label: 'Users',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          iconSize: 24,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          onTap: _onItemTapped,
         ),
       ),
     );
@@ -453,7 +482,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, 2),
@@ -542,6 +571,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStatCard(
       String title, String value, IconData icon, Color color) {
     return Container(
+      constraints: const BoxConstraints(
+        minHeight: 160,
+        maxHeight: 180,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -554,7 +587,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -567,13 +600,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 16),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.contain,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(height: 4),
@@ -582,42 +620,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: const TextStyle(
               color: Colors.black87,
               fontSize: 12,
+              height: 1.2,
             ),
-            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.left,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blue[800] : Colors.black54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

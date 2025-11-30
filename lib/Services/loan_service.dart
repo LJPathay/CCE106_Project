@@ -10,9 +10,9 @@ class LoanService {
         .collection('loans')
         .orderBy('dateApplied', descending: true)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           print('Received ${snapshot.docs.length} loan documents');
-          return snapshot.docs.map((doc) {
+          final futures = snapshot.docs.map((doc) async {
             // Get the raw document data
             final docData = doc.data();
 
@@ -39,7 +39,6 @@ class LoanService {
             loanData['id'] = doc.id;
 
             // Set default values for required fields
-            loanData['name'] = loanData['name'] ?? 'Unknown User';
             loanData['status'] = loanData['status'] ?? 'Pending';
             loanData['amount'] =
                 num.tryParse(loanData['amount']?.toString() ?? '0') ?? 0;
@@ -47,6 +46,27 @@ class LoanService {
             loanData['purpose'] = loanData['purpose'] ?? 'Not specified';
             loanData['email'] = loanData['email'] ?? 'No email';
             loanData['userId'] = loanData['userId'] ?? 'No user ID';
+
+            // Fetch user name if userId is present
+            String name = 'Unknown User';
+            if (loanData['userId'] != 'No user ID') {
+              try {
+                final userDoc = await _firestore
+                    .collection('Account')
+                    .doc(loanData['userId'])
+                    .get();
+                if (userDoc.exists) {
+                  final userData = userDoc.data();
+                  name =
+                      userData?['fullName'] ??
+                      userData?['name'] ??
+                      'Unknown User';
+                }
+              } catch (e) {
+                print('Error fetching user data for loan ${doc.id}: $e');
+              }
+            }
+            loanData['name'] = name;
 
             // Ensure date fields exist and are properly formatted
             final dateFields = ['dateApplied', 'dateApproved', 'dateRejected'];
@@ -62,7 +82,9 @@ class LoanService {
 
             print('Processed loan data: $loanData');
             return loanData;
-          }).toList();
+          });
+
+          return Future.wait(futures);
         });
   }
 
@@ -79,11 +101,25 @@ class LoanService {
     final doc = await _firestore.collection('loans').doc(loanId).get();
     if (doc.exists) {
       final data = doc.data() as Map<String, dynamic>;
+      
+      String name = data['name'] ?? 'Unknown User';
+      if (data['userId'] != null) {
+        try {
+          final userDoc = await _firestore.collection('Account').doc(data['userId']).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data();
+            name = userData?['fullName'] ?? userData?['name'] ?? 'Unknown User';
+          }
+        } catch (e) {
+          print('Error fetching user data for loan $loanId: $e');
+        }
+      }
+
       return {
         'id': doc.id,
         ...data,
         // Ensure all required fields have default values
-        'name': data['name'] ?? 'Unknown User',
+        'name': name,
         'status': data['status'] ?? 'Pending',
         'amount': data['amount'] ?? 0,
         'term': data['term'] ?? 'N/A',

@@ -11,7 +11,8 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _fullNameController = TextEditingController();
-  final _usernameController = TextEditingController();
+  final _birthdateController = TextEditingController();
+  DateTime? _selectedDate;
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
@@ -21,6 +22,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _isAgeVerified = false;
+  bool _acceptedTerms = false;
   final _formKey = GlobalKey<FormState>();
 
   final RegExp _emailRegex = RegExp(
@@ -29,6 +32,22 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_isAgeVerified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must be 18 years or older to register.'),
+        ),
+      );
+      return;
+    }
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must agree to the Terms and Conditions.'),
+        ),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       final credentials = await FirebaseAuth.instance
@@ -41,7 +60,13 @@ class _RegisterPageState extends State<RegisterPage> {
           .doc(credentials.user!.uid)
           .set({
             'fullName': _fullNameController.text.trim(),
-            'username': _usernameController.text.trim(),
+            'birthdate': _selectedDate != null
+                ? Timestamp.fromDate(_selectedDate!)
+                : null,
+            'age': _selectedDate != null
+                ? (DateTime.now().difference(_selectedDate!).inDays / 365)
+                      .floor()
+                : null,
             'email': _emailController.text.trim(),
             'phone': _phoneController.text.trim(),
             'address': _addressController.text.trim(),
@@ -136,13 +161,29 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
-                        controller: _usernameController,
+                        controller: _birthdateController,
+                        readOnly: true,
                         decoration: _inputDecoration(
-                          hintText: 'Choose a username',
-                          icon: Icons.account_box_outlined,
+                          hintText: 'Select your birthdate',
+                          icon: Icons.calendar_today,
                         ),
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime(2000),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                          );
+                          if (date != null) {
+                            setState(() {
+                              _selectedDate = date;
+                              _birthdateController.text =
+                                  "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                            });
+                          }
+                        },
                         validator: (v) =>
-                            v!.isEmpty ? 'Username is required' : null,
+                            v!.isEmpty ? 'Birthdate is required' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -193,6 +234,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             : null,
                       ),
                       const SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirm,
@@ -209,6 +251,28 @@ class _RegisterPageState extends State<RegisterPage> {
                             ? 'Passwords do not match'
                             : null,
                       ),
+                      const SizedBox(height: 16),
+
+                      // Checkboxes
+                      CheckboxListTile(
+                        value: _isAgeVerified,
+                        onChanged: (v) =>
+                            setState(() => _isAgeVerified = v ?? false),
+                        title: const Text('I am 18 years old and above'),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        activeColor: Colors.purple,
+                      ),
+                      CheckboxListTile(
+                        value: _acceptedTerms,
+                        onChanged: (v) =>
+                            setState(() => _acceptedTerms = v ?? false),
+                        title: const Text('I agree to Terms and Conditions'),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        activeColor: Colors.purple,
+                      ),
+
                       const SizedBox(height: 28),
                       SizedBox(
                         width: double.infinity,

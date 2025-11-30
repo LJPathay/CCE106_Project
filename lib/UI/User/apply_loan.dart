@@ -539,6 +539,49 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                       _calculate();
                       if (!_showSummary) return;
 
+                      // Show confirmation dialog
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          title: const Text(
+                            'Confirm Loan Application',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to submit this loan application?',
+                            style: TextStyle(color: Colors.black87),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text(
+                                'Confirm',
+                                style: TextStyle(
+                                  color: _accentPink,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm != true) return;
+
                       setState(() => _isSubmitting = true);
                       try {
                         final amount =
@@ -566,6 +609,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                             context: context,
                             barrierDismissible: false,
                             builder: (context) => AlertDialog(
+                              backgroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
@@ -580,12 +624,17 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                                   Text(
                                     'Application Submitted!',
                                     textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ],
                               ),
                               content: const Text(
                                 'Your loan application has been submitted successfully. We will review it shortly.',
                                 textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.black87),
                               ),
                               actions: [
                                 TextButton(
@@ -597,7 +646,10 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                                   },
                                   child: const Text(
                                     'OK',
-                                    style: TextStyle(fontSize: 16),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: _accentPink,
+                                    ),
                                   ),
                                 ),
                               ],

@@ -117,40 +117,6 @@ class _VerificationScreenState extends State<VerificationScreen> {
     }
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: SizedBox(
-          height: 70.0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSelected
-                    ? const Color(0xFF1E88E5)
-                    : const Color(0xFF9E9E9E),
-                size: 24.0,
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color(0xFF1E88E5)
-                      : const Color(0xFF9E9E9E),
-                  fontSize: 12.0,
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _loadVerificationRequests() async {
     if (!_isMounted || _isDisposed) return;
 
@@ -919,25 +885,48 @@ class _VerificationScreenState extends State<VerificationScreen> {
               ],
             ),
       bottomNavigationBar: Container(
-        height: 70.0,
         decoration: BoxDecoration(
-          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 1,
+              blurRadius: 5,
               offset: const Offset(0, -1),
             ),
           ],
         ),
-        child: Row(
-          children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.attach_money, 'Loans', 1),
-            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
-            _buildNavItem(Icons.person_outline, 'Users', 4),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined, size: 24),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.credit_card, size: 24),
+              label: 'Loans',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined, size: 24),
+              label: 'Verify',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_outlined, size: 24),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline, size: 24),
+              label: 'Users',
+            ),
           ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          iconSize: 24,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          onTap: _onItemTapped,
         ),
       ),
     );

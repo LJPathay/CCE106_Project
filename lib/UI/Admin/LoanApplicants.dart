@@ -337,14 +337,18 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    applicant['name'] ?? 'No Name',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                  Expanded(
+                    child: Text(
+                      applicant['name'] ?? 'No Name',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -417,12 +421,15 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
             children: [
               Icon(icon, size: 16, color: Colors.black54),
               const SizedBox(width: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black,
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -524,30 +531,36 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                     horizontal: 16,
                   ),
                   color: Colors.white,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem(
-                        'Total',
-                        _loanStats['total'].toString(),
-                        colorScheme.primary,
-                      ),
-                      _buildStatItem(
-                        'Pending',
-                        _loanStats['pending'].toString(),
-                        Colors.orange,
-                      ),
-                      _buildStatItem(
-                        'Approved',
-                        _loanStats['approved'].toString(),
-                        Colors.green,
-                      ),
-                      _buildStatItem(
-                        'Rejected',
-                        _loanStats['rejected'].toString(),
-                        Colors.red,
-                      ),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatItem(
+                          'Total',
+                          _loanStats['total'].toString(),
+                          colorScheme.primary,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Pending',
+                          _loanStats['pending'].toString(),
+                          Colors.orange,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Approved',
+                          _loanStats['approved'].toString(),
+                          Colors.green,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Rejected',
+                          _loanStats['rejected'].toString(),
+                          Colors.red,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Loan List
@@ -587,36 +600,49 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
                 ),
               ],
             ),
-      bottomNavigationBar: SizedBox(
-        height: 70, // Set the height to 70
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
+          ],
+        ),
         child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF1E88E5),
-          unselectedItemColor: Colors.grey,
-          onTap: _onItemTapped,
-          items: const [
+          items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
+              icon: Icon(Icons.dashboard_outlined, size: 24),
               label: 'Dashboard',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.attach_money),
+              icon: Icon(Icons.credit_card, size: 24),
               label: 'Loans',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.verified_user_outlined),
-              label: 'Verification',
+              icon: Icon(Icons.verified_user_outlined, size: 24),
+              label: 'Verify',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart_outlined),
+              icon: Icon(Icons.analytics_outlined, size: 24),
               label: 'Analytics',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
+              icon: Icon(Icons.people_outline, size: 24),
               label: 'Users',
             ),
           ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          iconSize: 24,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          onTap: _onItemTapped,
         ),
       ),
     );

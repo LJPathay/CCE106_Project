@@ -778,39 +778,45 @@ class _UsersScreenState extends State<UsersScreen> {
                     vertical: 12,
                   ),
                   color: Colors.blue[50],
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem(
-                        'Total',
-                        users.length.toString(),
-                        Colors.blue,
-                      ),
-                      _buildStatItem(
-                        'Active',
-                        users
-                            .where((u) => u['status'] == 'Active')
-                            .length
-                            .toString(),
-                        Colors.green,
-                      ),
-                      _buildStatItem(
-                        'Borrowers',
-                        users
-                            .where((u) => u['role'] == 'Borrower')
-                            .length
-                            .toString(),
-                        Colors.orange,
-                      ),
-                      _buildStatItem(
-                        'Admins',
-                        users
-                            .where((u) => u['role'] == 'Admin')
-                            .length
-                            .toString(),
-                        Colors.purple,
-                      ),
-                    ],
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatItem(
+                          'Total',
+                          users.length.toString(),
+                          Colors.blue,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Active',
+                          users
+                              .where((u) => u['status'] == 'Active')
+                              .length
+                              .toString(),
+                          Colors.green,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Borrowers',
+                          users
+                              .where((u) => u['role'] == 'Borrower')
+                              .length
+                              .toString(),
+                          Colors.orange,
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatItem(
+                          'Admins',
+                          users
+                              .where((u) => u['role'] == 'Admin')
+                              .length
+                              .toString(),
+                          Colors.purple,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Users List
@@ -934,15 +940,19 @@ class _UsersScreenState extends State<UsersScreen> {
                                                 const SizedBox(height: 4),
                                                 Row(
                                                   children: [
-                                                    Text(
-                                                      user['id'],
-                                                      style: theme
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            color:
-                                                                Colors.black54,
-                                                          ),
+                                                    Flexible(
+                                                      child: Text(
+                                                        user['id'],
+                                                        style: theme
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: Colors
+                                                                  .black54,
+                                                            ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
                                                     ),
                                                     const SizedBox(width: 8),
                                                     Container(
@@ -1067,20 +1077,49 @@ class _UsersScreenState extends State<UsersScreen> {
                 ),
               ],
             ),
-      bottomNavigationBar: BottomAppBar(
-        height: 70,
-        padding: EdgeInsets.zero,
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildNavItem(Icons.home_outlined, 'Home', 0),
-            _buildNavItem(Icons.attach_money, 'Loans', 1),
-            _buildNavItem(Icons.check_circle_outline, 'Verify', 2),
-            _buildNavItem(Icons.bar_chart_outlined, 'Reports', 3),
-            _buildNavItem(Icons.person_outline, 'Users', 4),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.3),
+              spreadRadius: 1,
+              blurRadius: 5,
+              offset: const Offset(0, -1),
+            ),
           ],
+        ),
+        child: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined, size: 24),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.credit_card, size: 24),
+              label: 'Loans',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.verified_user_outlined, size: 24),
+              label: 'Verify',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics_outlined, size: 24),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline, size: 24),
+              label: 'Users',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF1E88E5),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          iconSize: 24,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          onTap: _onItemTapped,
         ),
       ),
     );
@@ -1142,38 +1181,6 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
         Text(label, style: TextStyle(fontSize: 10, color: Colors.black54)),
       ],
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.blue[800] : Colors.black54,
-                size: 24,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.blue[800] : Colors.black54,
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
