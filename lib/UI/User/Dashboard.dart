@@ -5,7 +5,7 @@ import '../../Models/Loan.dart';
 import '../../Models/Payment.dart';
 import 'package:intl/intl.dart';
 
-const Color darkPink = Color(0xFFD81B60);
+import '../../layout/theme.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -114,9 +114,11 @@ class _DashboardPageState extends State<DashboardPage> {
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, "/login");
       } else if (value == 'verification') {
+        // ignore: use_build_context_synchronously
         Navigator.pushNamed(context, "/verification");
       } else if (value == 'profile') {
         // Navigate to profile page (you can create this route)
+        // ignore: use_build_context_synchronously
         Navigator.pushNamed(context, "/profile");
       } else if (value == 'notifications') {
         _showNotifications();
@@ -125,87 +127,164 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showNotifications() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: const [
-            Icon(Icons.notifications, color: darkPink),
-            SizedBox(width: 8),
-            Text("Notifications"),
-          ],
-        ),
-        content: Column(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            StreamBuilder<List<Loan>>(
-              stream: _firebaseService.getUserLoans(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      "No notifications at this time",
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                  );
-                }
-
-                final loans = snapshot.data!;
-                List<Widget> notifications = [];
-
-                for (var loan in loans) {
-                  if (loan.status == 'approved') {
-                    notifications.add(
-                      ListTile(
-                        leading: const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFF10B981),
-                        ),
-                        title: const Text("Loan Approved"),
-                        subtitle: Text(
-                          "Your loan of ${_formatCurrency(loan.amount)} has been approved",
-                        ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.notifications, color: AppTheme.primaryPink),
+                    SizedBox(width: 8),
+                    Text(
+                      "Notifications",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
-                    );
-                  } else if (loan.status == 'pending') {
-                    notifications.add(
-                      ListTile(
-                        leading: const Icon(
-                          Icons.pending,
-                          color: Color(0xFFF59E0B),
-                        ),
-                        title: const Text("Loan Pending"),
-                        subtitle: Text(
-                          "Your loan of ${_formatCurrency(loan.amount)} is under review",
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: StreamBuilder<List<Loan>>(
+                stream: _firebaseService.getUserLoans(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.notifications_off_outlined,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              "No notifications at this time",
+                              style: TextStyle(color: Colors.black54),
+                            ),
+                          ],
                         ),
                       ),
                     );
                   }
-                }
 
-                if (notifications.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text(
-                      "No notifications at this time",
-                      style: TextStyle(color: Colors.black54),
-                    ),
-                  );
-                }
+                  final loans = snapshot.data!;
+                  List<Widget> notifications = [];
 
-                return SizedBox(
-                  width: double.maxFinite,
-                  child: ListView(shrinkWrap: true, children: notifications),
-                );
-              },
+                  for (var loan in loans) {
+                    if (loan.status == 'approved') {
+                      notifications.add(
+                        _buildNotificationItem(
+                          Icons.check_circle,
+                          AppTheme.success,
+                          "Loan Approved",
+                          "Your loan of ${_formatCurrency(loan.amount)} has been approved",
+                        ),
+                      );
+                    } else if (loan.status == 'pending') {
+                      notifications.add(
+                        _buildNotificationItem(
+                          Icons.access_time,
+                          AppTheme.warning,
+                          "Loan Pending",
+                          "Your loan of ${_formatCurrency(loan.amount)} is under review",
+                        ),
+                      );
+                    } else if (loan.status == 'rejected') {
+                      notifications.add(
+                        _buildNotificationItem(
+                          Icons.error_outline,
+                          AppTheme.error,
+                          "Loan Rejected",
+                          "Your loan application was not approved",
+                        ),
+                      );
+                    }
+                  }
+
+                  if (notifications.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                          "No new notifications",
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView(shrinkWrap: true, children: notifications);
+                },
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem(
+    IconData icon,
+    Color color,
+    String title,
+    String message,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -247,10 +326,13 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: darkPink.withOpacity(0.1),
+                color: AppTheme.primaryPink.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.notifications_outlined, color: darkPink),
+              child: const Icon(
+                Icons.notifications_outlined,
+                color: AppTheme.primaryPink,
+              ),
             ),
             onPressed: _showNotifications,
           ),
@@ -267,7 +349,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 scale: _avatarPressed ? 0.9 : 1.0,
                 duration: const Duration(milliseconds: 120),
                 child: CircleAvatar(
-                  backgroundColor: darkPink,
+                  backgroundColor: AppTheme.primaryPink,
                   child: Text(
                     _getUsername(user?.email)[0].toUpperCase(),
                     style: const TextStyle(
@@ -379,7 +461,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: darkPink,
+        backgroundColor: AppTheme.primaryPink,
         onPressed: () => Navigator.pushNamed(context, "/apply-loan"),
         icon: const Icon(Icons.add_circle_outline, color: Colors.white),
         label: const Text(
@@ -410,7 +492,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withOpacity(0.4),
+            color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -427,7 +509,7 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -439,7 +521,7 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -458,7 +540,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         Text(
                           "Outstanding Balance",
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
@@ -478,7 +560,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
@@ -500,7 +582,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         Text(
                           "Repayment Progress",
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             fontSize: 13,
                           ),
                         ),
@@ -520,7 +602,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 8,
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Colors.white,
                         ),
@@ -542,7 +624,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       width: 1,
                       height: 40,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
                     Expanded(
                       child: _buildStatItem(
@@ -578,7 +660,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   fontSize: 11,
                 ),
               ),
@@ -637,7 +719,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -682,17 +764,20 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [darkPink.withOpacity(0.1), darkPink.withOpacity(0.05)],
+          colors: [
+            AppTheme.primaryPink.withValues(alpha: 0.1),
+            AppTheme.primaryPink.withValues(alpha: 0.05),
+          ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: darkPink.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.primaryPink.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: darkPink,
+              color: AppTheme.primaryPink,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -729,7 +814,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ElevatedButton(
             onPressed: () => Navigator.pushNamed(context, "/make-payment"),
             style: ElevatedButton.styleFrom(
-              backgroundColor: darkPink,
+              backgroundColor: AppTheme.primaryPink,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -812,7 +897,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -838,7 +923,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -884,7 +969,7 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -892,7 +977,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: BottomNavigationBar(
         backgroundColor: Colors.white,
-        selectedItemColor: darkPink,
+        selectedItemColor: AppTheme.primaryPink,
         unselectedItemColor: Colors.black38,
         type: BottomNavigationBarType.fixed,
         currentIndex: 0,

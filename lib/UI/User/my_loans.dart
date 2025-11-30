@@ -12,7 +12,6 @@ class MyLoansPage extends StatefulWidget {
 }
 
 class _MyLoansPageState extends State<MyLoansPage> {
-  static const Color _accentPink = Color(0xFFD81B60);
   final FirebaseService _firebaseService = FirebaseService();
 
   String _formatCurrency(double amount) {
@@ -22,6 +21,109 @@ class _MyLoansPageState extends State<MyLoansPage> {
   String _formatDate(DateTime? date) {
     if (date == null) return "No due date";
     return DateFormat('MMM dd, yyyy').format(date);
+  }
+
+  void _showLoanDetails(Loan loan) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Loan Details",
+                  style: AppTheme.heading.copyWith(color: Colors.black87),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _buildDetailRow("Purpose", loan.purpose),
+            _buildDetailRow("Amount", _formatCurrency(loan.amount)),
+            _buildDetailRow(
+              "Remaining Balance",
+              _formatCurrency(loan.remainingAmount),
+              isBold: true,
+              color: AppTheme.primaryPink,
+            ),
+            _buildDetailRow(
+              "Interest Rate",
+              "${(loan.interestRate * 100).toStringAsFixed(1)}%",
+            ),
+            _buildDetailRow("Next Due Date", _formatDate(loan.nextPaymentDue)),
+            _buildDetailRow(
+              "Status",
+              loan.status.toUpperCase(),
+              color: loan.status == 'approved'
+                  ? AppTheme.success
+                  : loan.status == 'pending'
+                  ? AppTheme.warning
+                  : Colors.black87,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, "/make-payment");
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryPink,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  "Make a Payment",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    Color? color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              fontSize: 16,
+              color: color ?? Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -96,6 +198,7 @@ class _MyLoansPageState extends State<MyLoansPage> {
                           'Borrowed: ${_formatCurrency(loan.amount)}  •  Remaining: ${_formatCurrency(loan.remainingAmount)}',
                       progress: loan.progress,
                       dueLabel: 'Next due: ${_formatDate(loan.nextPaymentDue)}',
+                      onDetailsPressed: () => _showLoanDetails(loan),
                     ),
                   ),
                 ),
@@ -104,7 +207,7 @@ class _MyLoansPageState extends State<MyLoansPage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accentPink,
+                    backgroundColor: AppTheme.primaryPink,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(22),
@@ -134,14 +237,14 @@ class _LoanCard extends StatelessWidget {
     required this.subtitle,
     required this.progress,
     required this.dueLabel,
+    required this.onDetailsPressed,
   });
 
   final String title;
   final String subtitle;
   final double progress;
   final String dueLabel;
-
-  static const Color _accentPink = Color(0xFFD81B60);
+  final VoidCallback onDetailsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +266,7 @@ class _LoanCard extends StatelessWidget {
               children: [
                 const Icon(
                   Icons.account_balance_wallet_outlined,
-                  color: _accentPink,
+                  color: AppTheme.primaryPink,
                   size: 24,
                 ),
                 const SizedBox(width: 12),
@@ -204,7 +307,7 @@ class _LoanCard extends StatelessWidget {
                       minHeight: 8,
                       backgroundColor: Colors.grey.shade200,
                       valueColor: const AlwaysStoppedAnimation<Color>(
-                        _accentPink,
+                        AppTheme.primaryPink,
                       ),
                     ),
                   ),
@@ -232,8 +335,10 @@ class _LoanCard extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(foregroundColor: _accentPink),
+                  onPressed: onDetailsPressed,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryPink,
+                  ),
                   child: const Text('Details'),
                 ),
               ],

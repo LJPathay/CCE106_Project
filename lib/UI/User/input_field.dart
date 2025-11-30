@@ -28,7 +28,7 @@ class InputField extends StatelessWidget {
         hintStyle: AppTheme.body.copyWith(color: AppTheme.textSecondary),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: AppTheme.secondary.withOpacity(0.2)),
+          borderSide: BorderSide(color: AppTheme.secondary.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),

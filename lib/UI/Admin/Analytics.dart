@@ -275,9 +275,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
-  void _handleLogout() {
-    Navigator.pushReplacementNamed(context, '/login');
-  }
 
   @override
   Widget build(BuildContext context) {

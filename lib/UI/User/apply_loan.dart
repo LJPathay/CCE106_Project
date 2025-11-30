@@ -267,7 +267,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -321,7 +321,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -373,7 +373,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -422,7 +422,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF2E3192).withOpacity(0.3),
+                      color: const Color(0xFF2E3192).withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -561,6 +561,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                         );
 
                         if (mounted) {
+                          // ignore: use_build_context_synchronously
                           showDialog(
                             context: context,
                             barrierDismissible: false,
@@ -616,6 +617,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                         }
                       } catch (e) {
                         if (mounted) {
+                          // ignore: use_build_context_synchronously
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Error: ${e.toString()}'),
@@ -636,7 +638,7 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
                   borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 4,
-                shadowColor: _accentPink.withOpacity(0.4),
+                shadowColor: _accentPink.withValues(alpha: 0.4),
               ),
               child: _isSubmitting
                   ? const SizedBox(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-const Color darkPink = Color(0xFFD81B60);
+import '../../layout/theme.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -90,7 +90,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    AppTheme.showLoadingDialog(context);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -105,32 +105,21 @@ class _ProfilePageState extends State<ProfilePage> {
             'address': _addressController.text.trim(),
           });
 
-      setState(() {
-        _fullName = _fullNameController.text.trim();
-        _phone = _phoneController.text.trim();
-        _address = _addressController.text.trim();
-        _isEditing = false;
-      });
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        Navigator.pop(context); // Dismiss loading dialog
+        setState(() {
+          _fullName = _fullNameController.text.trim();
+          _phone = _phoneController.text.trim();
+          _address = _addressController.text.trim();
+          _isEditing = false;
+        });
+        AppTheme.showSuccessSnackBar(context, 'Profile updated successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating profile: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Navigator.pop(context); // Dismiss loading dialog
+        AppTheme.showErrorSnackBar(context, 'Error updating profile: $e');
       }
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -146,7 +135,13 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Change Password'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Change Password',
+            style: AppTheme.subheading.copyWith(color: Colors.black87),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -210,26 +205,26 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () async {
                 if (newPasswordController.text !=
                     confirmPasswordController.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Passwords do not match')),
-                  );
+                  AppTheme.showErrorSnackBar(context, 'Passwords do not match');
                   return;
                 }
 
                 if (newPasswordController.text.length < 6) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Password must be at least 6 characters'),
-                    ),
+                  AppTheme.showErrorSnackBar(
+                    context,
+                    'Password must be at least 6 characters',
                   );
                   return;
                 }
+
+                Navigator.pop(context); // Close dialog
+                AppTheme.showLoadingDialog(context); // Show loading
 
                 try {
                   final user = FirebaseAuth.instance.currentUser;
@@ -242,25 +237,34 @@ class _ProfilePageState extends State<ProfilePage> {
                   await user.updatePassword(newPasswordController.text);
 
                   if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Password changed successfully'),
-                        backgroundColor: Colors.green,
-                      ),
+                    Navigator.pop(context); // Dismiss loading
+                    // ignore: use_build_context_synchronously
+                    AppTheme.showSuccessSnackBar(
+                      context,
+                      'Password changed successfully',
                     );
                   }
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  if (mounted) {
+                    Navigator.pop(context); // Dismiss loading
+                    // ignore: use_build_context_synchronously
+                    AppTheme.showErrorSnackBar(
+                      context,
+                      'Error: ${e.toString()}',
+                    );
+                  }
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: darkPink),
-              child: const Text('Change Password'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryPink,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Change Password',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -286,7 +290,7 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           if (!_isEditing)
             IconButton(
-              icon: const Icon(Icons.edit, color: darkPink),
+              icon: const Icon(Icons.edit, color: AppTheme.primaryPink),
               onPressed: () => setState(() => _isEditing = true),
             ),
         ],
@@ -305,19 +309,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        boxShadow: AppTheme.softShadow,
                       ),
                       child: Column(
                         children: [
                           CircleAvatar(
                             radius: 50,
-                            backgroundColor: darkPink,
+                            backgroundColor: AppTheme.primaryPink,
                             child: Text(
                               _fullName.isNotEmpty
                                   ? _fullName[0].toUpperCase()
@@ -354,13 +352,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             decoration: BoxDecoration(
                               color: _verificationStatus == 'Verified'
-                                  ? const Color(0xFF10B981).withOpacity(0.1)
-                                  : const Color(0xFFF59E0B).withOpacity(0.1),
+                                  ? AppTheme.success.withValues(alpha: 0.1)
+                                  : AppTheme.warning.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: _verificationStatus == 'Verified'
-                                    ? const Color(0xFF10B981)
-                                    : const Color(0xFFF59E0B),
+                                    ? AppTheme.success
+                                    : AppTheme.warning,
                               ),
                             ),
                             child: Row(
@@ -372,8 +370,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                       : Icons.pending,
                                   size: 16,
                                   color: _verificationStatus == 'Verified'
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFF59E0B),
+                                      ? AppTheme.success
+                                      : AppTheme.warning,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -382,8 +380,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                     color: _verificationStatus == 'Verified'
-                                        ? const Color(0xFF10B981)
-                                        : const Color(0xFFF59E0B),
+                                        ? AppTheme.success
+                                        : AppTheme.warning,
                                   ),
                                 ),
                               ],
@@ -400,13 +398,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        boxShadow: AppTheme.softShadow,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,7 +468,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: const Text('Cancel'),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.black87),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -484,7 +479,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: ElevatedButton(
                               onPressed: _saveProfile,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: darkPink,
+                                backgroundColor: AppTheme.primaryPink,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 16,
                                 ),
@@ -559,7 +554,7 @@ class _ProfilePageState extends State<ProfilePage> {
           enabled: enabled,
           maxLines: maxLines,
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: darkPink),
+            prefixIcon: Icon(icon, color: AppTheme.primaryPink),
             filled: true,
             fillColor: enabled ? Colors.white : Colors.grey[100],
             border: OutlineInputBorder(
@@ -572,7 +567,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: darkPink, width: 2),
+              borderSide: const BorderSide(
+                color: AppTheme.primaryPink,
+                width: 2,
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -608,13 +606,16 @@ class _ProfilePageState extends State<ProfilePage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isDestructive
-                ? Colors.red.withOpacity(0.3)
+                ? Colors.red.withValues(alpha: 0.3)
                 : Colors.grey[300]!,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isDestructive ? Colors.red : darkPink),
+            Icon(
+              icon,
+              color: isDestructive ? Colors.red : AppTheme.primaryPink,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -634,48 +635,39 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showDeleteAccountDialog() {
-    showDialog(
+    AppTheme.showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text(
+      title: 'Delete Account',
+      content:
           'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final user = FirebaseAuth.instance.currentUser;
-                await FirebaseFirestore.instance
-                    .collection('Account')
-                    .doc(user!.uid)
-                    .delete();
-                await user.delete();
+      confirmText: 'Delete',
+      confirmColor: Colors.red,
+    ).then((confirmed) async {
+      if (confirmed == true) {
+        AppTheme.showLoadingDialog(context);
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          await FirebaseFirestore.instance
+              .collection('Account')
+              .doc(user!.uid)
+              .delete();
+          await user.delete();
 
-                if (mounted) {
-                  Navigator.of(
-                    context,
-                  ).pushNamedAndRemoveUntil('/login', (route) => false);
-                }
-              } catch (e) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+          if (mounted) {
+            Navigator.pop(context); // Dismiss loading
+            // ignore: use_build_context_synchronously
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/login', (route) => false);
+          }
+        } catch (e) {
+          if (mounted) {
+            Navigator.pop(context); // Dismiss loading
+            // ignore: use_build_context_synchronously
+            AppTheme.showErrorSnackBar(context, 'Error: ${e.toString()}');
+          }
+        }
+      }
+    });
   }
 }

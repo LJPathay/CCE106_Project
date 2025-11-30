@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cce106_finance_project/services/loan_service.dart';
+import '../../layout/AdminTheme.dart';
 
 class LoanApplicantsScreen extends StatefulWidget {
   const LoanApplicantsScreen({super.key});
@@ -130,8 +131,10 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
   }
 
   Future<void> _updateStatus(String loanId, String status) async {
+    // Show blocking loading dialog
+    AdminTheme.showLoadingDialog(context);
+
     try {
-      setState(() => _isLoading = true);
       await _loanService.updateLoanStatus(loanId, status);
 
       // Refresh stats after update
@@ -142,21 +145,21 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
           _loanStats
             ..clear()
             ..addAll(stats);
-          _isLoading = false;
         });
-      }
 
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Status updated to $status')));
+        // Close loading dialog
+        Navigator.pop(context);
+
+        // Show success message
+        AdminTheme.showSuccessSnackBar(context, 'Status updated to $status');
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
+        // Close loading dialog
+        Navigator.pop(context);
+
+        // Show error message
+        AdminTheme.showErrorSnackBar(context, 'Failed to update status: $e');
       }
     }
   }

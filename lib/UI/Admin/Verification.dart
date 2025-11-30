@@ -640,71 +640,57 @@ class _VerificationScreenState extends State<VerificationScreen> {
     );
   }
 
-  void _handleApprove(VerificationRequest request) {
-    showDialog(
+  void _handleApprove(VerificationRequest request) async {
+    final confirmed = await AdminTheme.showConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Approve Verification'),
-        content: const Text(
+      title: 'Approve Verification',
+      content:
           'Are you sure you want to approve this verification request? This will mark the user as verified.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _firestore.runTransaction((transaction) async {
-                  // Update verification request status
-                  transaction.update(
-                    _firestore
-                        .collection('verificationRequests')
-                        .doc(request.id),
-                    {'status': 'approved'},
-                  );
-
-                  // Update user verification status
-                  transaction.update(
-                    _firestore.collection('Account').doc(request.userId),
-                    {'isVerified': true},
-                  );
-                });
-
-                setState(() {
-                  request.status = 'Approved';
-                });
-
-                if (mounted) {
-                  Navigator.pop(context); // Close dialog
-                  Navigator.pop(context); // Close bottom sheet
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Verification approved successfully'),
-                      backgroundColor: AdminTheme.success,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to approve verification: $e'),
-                      backgroundColor: AdminTheme.danger,
-                    ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AdminTheme.success,
-            ),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
+      confirmText: 'Approve',
+      confirmColor: AdminTheme.success,
     );
+
+    if (confirmed != true) return;
+
+    if (!mounted) return;
+    AdminTheme.showLoadingDialog(context);
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // Update verification request status
+        transaction.update(
+          _firestore.collection('verificationRequests').doc(request.id),
+          {'status': 'approved'},
+        );
+
+        // Update user verification status
+        transaction.update(
+          _firestore.collection('Account').doc(request.userId),
+          {'isVerified': true},
+        );
+      });
+
+      setState(() {
+        request.status = 'Approved';
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        Navigator.pop(context); // Close bottom sheet
+        AdminTheme.showSuccessSnackBar(
+          context,
+          'Verification approved successfully',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        AdminTheme.showErrorSnackBar(
+          context,
+          'Failed to approve verification: $e',
+        );
+      }
+    }
   }
 
   void _handleReject(VerificationRequest request) {
@@ -712,7 +698,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reject Verification'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Reject Verification', style: AdminTheme.subheading),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,11 +719,21 @@ class _VerificationScreenState extends State<VerificationScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AdminTheme.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
               final reason = _notesController.text.trim();
+
+              // Close the rejection dialog first
+              Navigator.pop(context);
+
+              // Show loading
+              AdminTheme.showLoadingDialog(context);
+
               try {
                 await _firestore
                     .collection('verificationRequests')
@@ -748,28 +745,30 @@ class _VerificationScreenState extends State<VerificationScreen> {
                 });
 
                 if (mounted) {
-                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Close loading dialog
                   Navigator.pop(context); // Close bottom sheet
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Verification rejected'),
-                      backgroundColor: AdminTheme.danger,
-                    ),
+                  AdminTheme.showSuccessSnackBar(
+                    context,
+                    'Verification rejected',
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to reject verification: $e'),
-                      backgroundColor: AdminTheme.danger,
-                    ),
+                  Navigator.pop(context); // Close loading dialog
+                  AdminTheme.showErrorSnackBar(
+                    context,
+                    'Failed to reject verification: $e',
                   );
                 }
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AdminTheme.danger),
-            child: const Text('Reject'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.danger,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text('Reject', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -808,8 +807,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
             ),
             onSelected: (value) {
               if (value == 'logout') {
-                // Handle logout
-                Navigator.pushReplacementNamed(context, '/login');
+                handleLogout();
               }
             },
             itemBuilder: (BuildContext context) => [

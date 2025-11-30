@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../layout/AdminTheme.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -324,12 +325,8 @@ class _UsersScreenState extends State<UsersScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Edit functionality coming soon'),
-                          ),
-                        );
+                        Navigator.pop(context); // Close sheet
+                        _showEditUserDialog(user);
                       },
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit'),
@@ -399,6 +396,233 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
+  Future<void> _showAddUserDialog() async {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+    String role = 'Borrower';
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Add New User', style: AdminTheme.subheading),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: role,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Borrower', child: Text('Borrower')),
+                  DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                ],
+                onChanged: (value) => role = value!,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AdminTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || emailController.text.isEmpty) {
+                AdminTheme.showErrorSnackBar(
+                  context,
+                  'Name and Email are required',
+                );
+                return;
+              }
+
+              Navigator.pop(context); // Close dialog
+              AdminTheme.showLoadingDialog(context);
+
+              try {
+                // Create user document in Firestore
+                // Note: This does not create Auth credentials (client-side limitation)
+                await FirebaseFirestore.instance.collection('Account').add({
+                  'fullName': nameController.text.trim(),
+                  'email': emailController.text.trim(),
+                  'phone': phoneController.text.trim(),
+                  'isAdmin': role == 'Admin',
+                  'role': role, // Redundant but useful for queries
+                  'status': 'Active',
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'isVerified': false,
+                });
+
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                  AdminTheme.showSuccessSnackBar(
+                    context,
+                    'User added successfully',
+                  );
+                  _loadUsers(); // Refresh list
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                  AdminTheme.showErrorSnackBar(
+                    context,
+                    'Failed to add user: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.secondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text(
+              'Add User',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEditUserDialog(Map<String, dynamic> user) async {
+    final nameController = TextEditingController(text: user['name']);
+    final phoneController = TextEditingController(text: user['phone']);
+    String role = user['role'];
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Edit User', style: AdminTheme.subheading),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: role,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Borrower', child: Text('Borrower')),
+                  DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                ],
+                onChanged: (value) => role = value!,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AdminTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              AdminTheme.showLoadingDialog(context);
+
+              try {
+                await FirebaseFirestore.instance
+                    .collection('Account')
+                    .doc(user['id'])
+                    .update({
+                      'fullName': nameController.text.trim(),
+                      'phone': phoneController.text.trim(),
+                      'isAdmin': role == 'Admin',
+                      'role': role,
+                    });
+
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                  Navigator.pop(context); // Close details sheet if open
+                  AdminTheme.showSuccessSnackBar(
+                    context,
+                    'User updated successfully',
+                  );
+                  _loadUsers(); // Refresh list
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context); // Close loading
+                  AdminTheme.showErrorSnackBar(
+                    context,
+                    'Failed to update user: $e',
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AdminTheme.secondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -461,6 +685,11 @@ class _UsersScreenState extends State<UsersScreen> {
           ),
           const SizedBox(width: 8),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddUserDialog,
+        backgroundColor: AdminTheme.secondary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

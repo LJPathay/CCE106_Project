@@ -22,11 +22,11 @@ class _VerificationPageState extends State<VerificationPage> {
   String _selectedIdType = 'National ID';
   XFile? _selectedImage;
   Uint8List? _selectedImageBytes;
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
   bool _isVerified = false;
   bool _isLoading = true;
 
-  static const Color _accentPink = Color(0xFFD81B60);
+  static const Color _accentPink = AppTheme.primaryPink;
 
   final List<String> _idTypes = [
     'National ID',
@@ -74,12 +74,7 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppTheme.showErrorSnackBar(context, 'Error picking image: $e');
       }
     }
   }
@@ -99,28 +94,18 @@ class _VerificationPageState extends State<VerificationPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking image: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppTheme.showErrorSnackBar(context, 'Error picking image: $e');
       }
     }
   }
 
   Future<void> _submitVerification() async {
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please upload a photo of your ID'),
-          backgroundColor: _accentPink,
-        ),
-      );
+      AppTheme.showErrorSnackBar(context, 'Please upload a photo of your ID');
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    AppTheme.showLoadingDialog(context);
 
     try {
       // Upload image to Cloudinary first
@@ -140,30 +125,20 @@ class _VerificationPageState extends State<VerificationPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Verification request submitted! We will review your documents and notify you once verified.',
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
+        Navigator.pop(context); // Dismiss loading dialog
+        AppTheme.showSuccessSnackBar(
+          context,
+          'Verification request submitted! We will review your documents and notify you once verified.',
         );
-        _selectedImage = null;
-        _additionalInfoController.clear();
+        setState(() {
+          _selectedImage = null;
+          _additionalInfoController.clear();
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
+        Navigator.pop(context); // Dismiss loading dialog
+        AppTheme.showErrorSnackBar(context, 'Error: ${e.toString()}');
       }
     }
   }
@@ -206,10 +181,14 @@ class _VerificationPageState extends State<VerificationPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: AppTheme.success.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.verified, color: Colors.green, size: 80),
+              child: const Icon(
+                Icons.verified,
+                color: AppTheme.success,
+                size: 80,
+              ),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -217,7 +196,7 @@ class _VerificationPageState extends State<VerificationPage> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.green,
+                color: AppTheme.success,
               ),
             ),
             const SizedBox(height: 12),
@@ -239,6 +218,11 @@ class _VerificationPageState extends State<VerificationPage> {
         // Info Card
         Card(
           color: Colors.blue.shade50,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.blue.shade100),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -258,22 +242,18 @@ class _VerificationPageState extends State<VerificationPage> {
         const SizedBox(height: 24),
 
         // ID Type
-        const Text(
+        Text(
           'ID Type',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black,
-          ),
+          style: AppTheme.subheading.copyWith(color: Colors.black87),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedIdType,
@@ -287,7 +267,7 @@ class _VerificationPageState extends State<VerificationPage> {
                   value: type,
                   child: Text(
                     type,
-                    style: const TextStyle(color: Colors.black),
+                    style: const TextStyle(color: Colors.black87),
                   ),
                 );
               }).toList(),
@@ -299,22 +279,21 @@ class _VerificationPageState extends State<VerificationPage> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // ID Photo Upload
-        const Text(
+        Text(
           'Upload ID Photo',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black,
-          ),
+          style: AppTheme.subheading.copyWith(color: Colors.black87),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         GestureDetector(
           onTap: () {
             showModalBottomSheet(
               context: context,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
               builder: (context) => SafeArea(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -344,10 +323,10 @@ class _VerificationPageState extends State<VerificationPage> {
             height: 200,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: _selectedImage != null
-                    ? Colors.green
+                    ? AppTheme.success
                     : Colors.grey.shade300,
                 width: 2,
               ),
@@ -356,7 +335,7 @@ class _VerificationPageState extends State<VerificationPage> {
                 ? Stack(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         child: _selectedImage != null
                             ? FutureBuilder<Uint8List>(
                                 future: _selectedImage!.readAsBytes(),
@@ -400,7 +379,7 @@ class _VerificationPageState extends State<VerificationPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.add_photo_alternate,
+                        Icons.add_photo_alternate_outlined,
                         size: 64,
                         color: Colors.grey.shade400,
                       ),
@@ -410,6 +389,7 @@ class _VerificationPageState extends State<VerificationPage> {
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -424,18 +404,14 @@ class _VerificationPageState extends State<VerificationPage> {
                   ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Additional Information
-        const Text(
+        Text(
           'Additional Information (Optional)',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black,
-          ),
+          style: AppTheme.subheading.copyWith(color: Colors.black87),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         SizedBox(
           height: 100,
           child: TextField(
@@ -447,26 +423,38 @@ class _VerificationPageState extends State<VerificationPage> {
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: AppTheme.primaryPink,
+                  width: 2,
+                ),
               ),
             ),
             style: const TextStyle(color: Colors.black87),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
 
         // Submit Button
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _accentPink,
+              backgroundColor: AppTheme.primaryPink,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.symmetric(vertical: 16),
-              elevation: 1,
+              elevation: 2,
             ),
             onPressed: _isSubmitting ? null : _submitVerification,
             child: _isSubmitting
@@ -480,7 +468,7 @@ class _VerificationPageState extends State<VerificationPage> {
                   )
                 : const Text(
                     'Submit Verification Request',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
           ),
         ),
