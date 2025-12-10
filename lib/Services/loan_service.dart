@@ -90,10 +90,31 @@ class LoanService {
 
   // Update loan application status
   Future<void> updateLoanStatus(String loanId, String status) async {
-    await _firestore.collection('loans').doc(loanId).update({
-      'status': status,
+    final normalizedStatus = status.toLowerCase();
+
+    // Get the loan document to access totalAmount
+    final loanDoc = await _firestore.collection('loans').doc(loanId).get();
+    final loanData = loanDoc.data();
+
+    Map<String, dynamic> updateData = {
+      'status': normalizedStatus,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    // When approving, initialize payment tracking fields
+    if (normalizedStatus == 'approved') {
+      final totalAmount = (loanData?['totalAmount'] ?? 0).toDouble();
+      final paidAmount = (loanData?['paidAmount'] ?? 0).toDouble();
+      final remainingAmount = totalAmount - paidAmount;
+
+      updateData['dateApproved'] = FieldValue.serverTimestamp();
+      updateData['paidAmount'] = paidAmount;
+      updateData['remainingAmount'] = remainingAmount;
+    } else if (normalizedStatus == 'rejected') {
+      updateData['dateRejected'] = FieldValue.serverTimestamp();
+    }
+
+    await _firestore.collection('loans').doc(loanId).update(updateData);
   }
 
   // Get loan application by ID
@@ -101,11 +122,14 @@ class LoanService {
     final doc = await _firestore.collection('loans').doc(loanId).get();
     if (doc.exists) {
       final data = doc.data() as Map<String, dynamic>;
-      
+
       String name = data['name'] ?? 'Unknown User';
       if (data['userId'] != null) {
         try {
-          final userDoc = await _firestore.collection('Account').doc(data['userId']).get();
+          final userDoc = await _firestore
+              .collection('Account')
+              .doc(data['userId'])
+              .get();
           if (userDoc.exists) {
             final userData = userDoc.data();
             name = userData?['fullName'] ?? userData?['name'] ?? 'Unknown User';

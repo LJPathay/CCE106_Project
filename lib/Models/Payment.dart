@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Payment {
   final String id;
   final String userId;
@@ -40,6 +42,14 @@ class Payment {
     };
   }
 
+  // Helper method to parse dates from Firestore (handles both Timestamp and String)
+  static DateTime _parseDate(dynamic date) {
+    if (date == null) return DateTime.now();
+    if (date is Timestamp) return date.toDate();
+    if (date is String) return DateTime.parse(date);
+    return DateTime.now();
+  }
+
   factory Payment.fromMap(Map<String, dynamic> map, String documentId) {
     return Payment(
       id: documentId,
@@ -51,9 +61,10 @@ class Payment {
       amount: (map['amount'] ?? 0).toDouble(),
       details: map['details'],
       status: map['status'] ?? 'pending',
-      createdAt: DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
-      completedAt: map['completedAt'] != null ? DateTime.parse(map['completedAt']) : null,
+      createdAt: _parseDate(map['createdAt']),
+      completedAt: map['completedAt'] != null
+          ? _parseDate(map['completedAt'])
+          : null,
     );
   }
 }
-

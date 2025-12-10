@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Loan {
   final String id;
   final String userId;
@@ -7,7 +9,8 @@ class Loan {
   final double monthlyPayment;
   final String term; // e.g., "3 months - 5%"
   final String purpose;
-  final String status; // "pending", "approved", "rejected", "active", "completed"
+  final String
+  status; // "pending", "approved", "rejected", "active", "completed"
   final DateTime createdAt;
   final DateTime? approvedAt;
   final double paidAmount;
@@ -49,6 +52,14 @@ class Loan {
     };
   }
 
+  // Helper method to parse dates from Firestore (handles both Timestamp and String)
+  static DateTime _parseDate(dynamic date) {
+    if (date == null) return DateTime.now();
+    if (date is Timestamp) return date.toDate();
+    if (date is String) return DateTime.parse(date);
+    return DateTime.now();
+  }
+
   factory Loan.fromMap(Map<String, dynamic> map, String documentId) {
     return Loan(
       id: documentId,
@@ -60,14 +71,17 @@ class Loan {
       term: map['term'] ?? '',
       purpose: map['purpose'] ?? '',
       status: map['status'] ?? 'pending',
-      createdAt: DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
-      approvedAt: map['approvedAt'] != null ? DateTime.parse(map['approvedAt']) : null,
+      createdAt: _parseDate(map['createdAt']),
+      approvedAt: map['approvedAt'] != null
+          ? _parseDate(map['approvedAt'])
+          : null,
       paidAmount: (map['paidAmount'] ?? 0).toDouble(),
       remainingAmount: (map['remainingAmount'] ?? 0).toDouble(),
-      nextPaymentDue: map['nextPaymentDue'] != null ? DateTime.parse(map['nextPaymentDue']) : null,
+      nextPaymentDue: map['nextPaymentDue'] != null
+          ? _parseDate(map['nextPaymentDue'])
+          : null,
     );
   }
 
   double get progress => totalAmount > 0 ? paidAmount / totalAmount : 0.0;
 }
-

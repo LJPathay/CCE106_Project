@@ -221,7 +221,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
           if (canReject)
             TextButton(
               onPressed: () {
-                _updateStatus(applicant['id'], 'Rejected');
+                _updateStatus(applicant['id'], 'rejected');
                 Navigator.pop(context);
               },
               child: const Text('REJECT', style: TextStyle(color: Colors.red)),
@@ -229,7 +229,7 @@ class _LoanApplicantsScreenState extends State<LoanApplicantsScreen> {
           if (canApprove)
             ElevatedButton(
               onPressed: () {
-                _updateStatus(applicant['id'], 'Approved');
+                _updateStatus(applicant['id'], 'approved');
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),

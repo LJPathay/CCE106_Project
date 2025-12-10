@@ -14,23 +14,15 @@ class _ApplyLoanPageState extends State<ApplyLoanPage>
   final TextEditingController _amountController = TextEditingController();
 
   final Map<String, Map<String, dynamic>> _loanTerms = {
-    '7 days - 5%': {'months': 0.23, 'interestRate': 5.0, 'label': '7 days'},
-    '14 days - 4%': {'months': 0.47, 'interestRate': 4.0, 'label': '14 days'},
+    '7 days - 3%': {'months': 0.23, 'interestRate': 3.0, 'label': '7 days'},
+    '14 days - 3%': {'months': 0.47, 'interestRate': 3.0, 'label': '14 days'},
     '1 month - 3%': {'months': 1, 'interestRate': 3.0, 'label': '1 month'},
-    '3 months - 2.5%': {'months': 3, 'interestRate': 2.5, 'label': '3 months'},
-    '6 months - 2%': {'months': 6, 'interestRate': 2.0, 'label': '6 months'},
-    '12 months - 1.8%': {
-      'months': 12,
-      'interestRate': 1.8,
-      'label': '12 months',
-    },
-    '24 months - 1.5%': {
-      'months': 24,
-      'interestRate': 1.5,
-      'label': '24 months',
-    },
+    '3 months - 4%': {'months': 3, 'interestRate': 4.0, 'label': '3 months'},
+    '6 months - 5%': {'months': 6, 'interestRate': 5.0, 'label': '6 months'},
+    '12 months - 6%': {'months': 12, 'interestRate': 6.0, 'label': '12 months'},
+    '24 months - 7%': {'months': 24, 'interestRate': 7.0, 'label': '24 months'},
   };
-  String _selectedTerm = '3 months - 2.5%';
+  String _selectedTerm = '3 months - 4%';
 
   final List<String> _loanPurposes = [
     'Personal/Emergency',

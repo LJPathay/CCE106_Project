@@ -59,12 +59,16 @@ class FirebaseService {
     if (currentUserId == null) throw Exception('User not authenticated');
 
     // Get user data from Account collection
-    final userDoc = await _firestore.collection('Account').doc(currentUserId).get();
+    final userDoc = await _firestore
+        .collection('Account')
+        .doc(currentUserId)
+        .get();
     final userData = userDoc.data();
-    final String fullName = userData?['fullName'] ?? 
-                          userData?['name'] ?? 
-                          userData?['username'] ?? 
-                          'User ID: $currentUserId';
+    final String fullName =
+        userData?['fullName'] ??
+        userData?['name'] ??
+        userData?['username'] ??
+        'User ID: $currentUserId';
 
     // Save the verification request with Cloudinary image URL and user details
     await _firestore.collection('verificationRequests').add({
@@ -93,13 +97,16 @@ class FirebaseService {
     if (currentUserId == null) throw Exception('User not authenticated');
 
     // Get user data first
-    final userDoc = await _firestore.collection('users').doc(currentUserId).get();
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .get();
     final userData = userDoc.data();
 
     // Ensure consistent date format using server timestamp
     final now = FieldValue.serverTimestamp();
-    
-    // Create loan data with explicit types and ensure status is 'Pending'
+
+    // Create loan data with explicit types and ensure status is 'pending'
     final Map<String, dynamic> loanData = {
       'userId': currentUserId,
       'name': userData?['fullName'] ?? userData?['name'] ?? 'Unknown User',
@@ -110,7 +117,7 @@ class FirebaseService {
       'monthlyPayment': monthlyPayment,
       'term': term,
       'purpose': purpose,
-      'status': 'Pending', // Explicitly set status to 'Pending'
+      'status': 'pending', // Explicitly set status to 'pending' (lowercase)
       'dateApplied': now,
       'createdAt': now,
       'updatedAt': now,
@@ -118,13 +125,17 @@ class FirebaseService {
 
     // Save to the main loans collection (admin panel)
     final docRef = await _firestore.collection('loans').add(loanData);
-    
+
     // Also save to user's personal loans collection with the same data
-    await _firestore.collection('users').doc(currentUserId).collection('loans').add({
-      ...loanData,
-      'applicationId': docRef.id,  // Add application ID for reference
-    });
-    
+    await _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .collection('loans')
+        .add({
+          ...loanData,
+          'applicationId': docRef.id, // Add application ID for reference
+        });
+
     return docRef.id;
   }
 
@@ -156,16 +167,18 @@ class FirebaseService {
       return Stream.value([]);
     }
 
-    // Query without orderBy to avoid composite index requirement
-    // We'll sort in memory instead
+    // Get all loans and filter in-memory for case-insensitive status matching
     return _firestore
         .collection('loans')
         .where('userId', isEqualTo: currentUserId)
-        .where('status', whereIn: ['approved', 'active'])
         .snapshots()
         .map((snapshot) {
           final loans = snapshot.docs
               .map((doc) => Loan.fromMap(doc.data(), doc.id))
+              .where((loan) {
+                final statusLower = loan.status.toLowerCase();
+                return statusLower == 'approved' || statusLower == 'active';
+              })
               .toList();
           // Sort by createdAt descending
           loans.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -264,11 +277,10 @@ class FirebaseService {
     if (currentUserId == null) return 0.0;
 
     try {
-      // Get all approved/active loans
+      // Get all loans and filter in-memory for case-insensitive status
       final loansSnapshot = await _firestore
           .collection('loans')
           .where('userId', isEqualTo: currentUserId)
-          .where('status', whereIn: ['approved', 'active'])
           .get();
 
       double totalBorrowed = 0.0;
@@ -276,8 +288,11 @@ class FirebaseService {
 
       for (var doc in loansSnapshot.docs) {
         final loan = Loan.fromMap(doc.data(), doc.id);
-        totalBorrowed += loan.amount;
-        totalPaid += loan.paidAmount;
+        final statusLower = loan.status.toLowerCase();
+        if (statusLower == 'approved' || statusLower == 'active') {
+          totalBorrowed += loan.amount;
+          totalPaid += loan.paidAmount;
+        }
       }
 
       // For demo purposes, we'll use a base balance
@@ -296,13 +311,14 @@ class FirebaseService {
       final loansSnapshot = await _firestore
           .collection('loans')
           .where('userId', isEqualTo: currentUserId)
-          .where('status', whereIn: ['approved', 'active'])
           .get();
 
       DateTime? earliestDue;
       for (var doc in loansSnapshot.docs) {
         final loan = Loan.fromMap(doc.data(), doc.id);
-        if (loan.nextPaymentDue != null) {
+        final statusLower = loan.status.toLowerCase();
+        if ((statusLower == 'approved' || statusLower == 'active') &&
+            loan.nextPaymentDue != null) {
           if (earliestDue == null ||
               loan.nextPaymentDue!.isBefore(earliestDue)) {
             earliestDue = loan.nextPaymentDue;
@@ -326,10 +342,10 @@ class FirebaseService {
       });
     }
 
+    // Get all loans for user and filter in-memory for case-insensitive status matching
     return _firestore
         .collection('loans')
         .where('userId', isEqualTo: currentUserId)
-        .where('status', whereIn: ['approved', 'active'])
         .snapshots()
         .map((snapshot) {
           int activeLoans = 0;
@@ -338,9 +354,14 @@ class FirebaseService {
 
           for (var doc in snapshot.docs) {
             final loan = Loan.fromMap(doc.data(), doc.id);
-            activeLoans++;
-            totalBorrowed += loan.amount;
-            totalPaid += loan.paidAmount;
+            final statusLower = loan.status.toLowerCase();
+
+            // Only count approved or active loans (case-insensitive)
+            if (statusLower == 'approved' || statusLower == 'active') {
+              activeLoans++;
+              totalBorrowed += loan.amount;
+              totalPaid += loan.paidAmount;
+            }
           }
 
           return {
@@ -361,7 +382,6 @@ class FirebaseService {
       final loansSnapshot = await _firestore
           .collection('loans')
           .where('userId', isEqualTo: currentUserId)
-          .where('status', whereIn: ['approved', 'active'])
           .get();
 
       int activeLoans = 0;
@@ -370,9 +390,12 @@ class FirebaseService {
 
       for (var doc in loansSnapshot.docs) {
         final loan = Loan.fromMap(doc.data(), doc.id);
-        activeLoans++;
-        totalBorrowed += loan.amount;
-        totalPaid += loan.paidAmount;
+        final statusLower = loan.status.toLowerCase();
+        if (statusLower == 'approved' || statusLower == 'active') {
+          activeLoans++;
+          totalBorrowed += loan.amount;
+          totalPaid += loan.paidAmount;
+        }
       }
 
       return {

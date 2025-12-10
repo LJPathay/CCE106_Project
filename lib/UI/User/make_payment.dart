@@ -496,6 +496,78 @@ class _MakePaymentPageState extends State<MakePaymentPage> {
                             return;
                           }
 
+                          // Show confirmation dialog
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text(
+                                'Confirm Payment',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Please confirm your payment details:',
+                                    style: TextStyle(color: Colors.black87),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Amount: ${_formatCurrency(amount)}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Method: $_selectedMethod',
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Account: ${_accountController.text.trim()}',
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text(
+                                    'Confirm',
+                                    style: TextStyle(
+                                      color: _accentPink,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm != true) return;
+
                           setState(() => _isSubmitting = true);
                           try {
                             await _firebaseService.submitPayment(
